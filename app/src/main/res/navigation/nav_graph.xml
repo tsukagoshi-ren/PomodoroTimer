@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/presetListFragment">
+
+    <fragment
+        android:id="@+id/presetListFragment"
+        android:name="com.androidapp.pomodorotimer.ui.list.PresetListFragment"
+        android:label="プリセット一覧">
+        <action
+            android:id="@+id/action_list_to_create"
+            app:destination="@id/presetCreateFragment" />
+        <action
+            android:id="@+id/action_list_to_edit"
+            app:destination="@id/presetEditFragment" />
+        <action
+            android:id="@+id/action_list_to_timer"
+            app:destination="@id/timerFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/presetCreateFragment"
+        android:name="com.androidapp.pomodorotimer.ui.create.PresetCreateFragment"
+        android:label="新規作成" />
+
+    <fragment
+        android:id="@+id/presetEditFragment"
+        android:name="com.androidapp.pomodorotimer.ui.edit.PresetEditFragment"
+        android:label="編集">
+        <argument
+            android:name="presetId"
+            app:argType="integer" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/timerFragment"
+        android:name="com.androidapp.pomodorotimer.ui.timer.TimerFragment"
+        android:label="タイマー">
+        <argument
+            android:name="presetId"
+            app:argType="integer" />
+    </fragment>
+
+</navigation>
