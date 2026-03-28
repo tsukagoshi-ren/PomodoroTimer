@@ -3,8 +3,8 @@ package com.androidapp.pomodorotimer.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.androidapp.pomodorotimer.data.model.preset.Preset
-import com.androidapp.pomodorotimer.data.repository.preset.PresetRepository
+import com.androidapp.pomodorotimer.data.model.Preset
+import com.androidapp.pomodorotimer.data.repository.PresetRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -15,16 +15,10 @@ class PresetListViewModel(
 ) : ViewModel() {
 
     val presets: StateFlow<List<Preset>> = repository.getAllPresets()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun deletePreset(preset: Preset) {
-        viewModelScope.launch {
-            repository.deletePreset(preset)
-        }
+        viewModelScope.launch { repository.deletePreset(preset) }
     }
 
     class Factory(private val repository: PresetRepository) : ViewModelProvider.Factory {

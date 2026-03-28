@@ -9,34 +9,39 @@
         android:name="com.androidapp.pomodorotimer.ui.list.PresetListFragment"
         android:label="プリセット一覧">
         <action
-            android:id="@+id/action_list_to_create"
-            app:destination="@id/presetCreateFragment" />
-        <action
-            android:id="@+id/action_list_to_edit"
+            android:id="@+id/action_list_to_presetEdit"
             app:destination="@id/presetEditFragment" />
         <action
-            android:id="@+id/action_list_to_timer"
-            app:destination="@id/timerFragment" />
+            android:id="@+id/action_list_to_timerRun"
+            app:destination="@id/timerRunFragment" />
     </fragment>
 
     <fragment
-        android:id="@+id/presetCreateFragment"
-        android:name="com.androidapp.pomodorotimer.ui.create.PresetCreateFragment"
-        android:label="新規作成" />
+        android:id="@+id/presetEditFragment"
+        android:name="com.androidapp.pomodorotimer.ui.presetedit.PresetEditFragment"
+        android:label="プリセット編集">
+        <argument
+            android:name="presetId"
+            app:argType="integer"
+            android:defaultValue="-1" />
+        <action
+            android:id="@+id/action_presetEdit_to_routineEdit"
+            app:destination="@id/routineEditFragment" />
+    </fragment>
 
     <fragment
-        android:id="@+id/presetEditFragment"
-        android:name="com.androidapp.pomodorotimer.ui.edit.PresetEditFragment"
-        android:label="編集">
+        android:id="@+id/routineEditFragment"
+        android:name="com.androidapp.pomodorotimer.ui.routineedit.RoutineEditFragment"
+        android:label="ルーティン編集">
         <argument
             android:name="presetId"
             app:argType="integer" />
     </fragment>
 
     <fragment
-        android:id="@+id/timerFragment"
-        android:name="com.androidapp.pomodorotimer.ui.timer.TimerFragment"
-        android:label="タイマー">
+        android:id="@+id/timerRunFragment"
+        android:name="com.androidapp.pomodorotimer.ui.timerrun.TimerRunFragment"
+        android:label="実行中">
         <argument
             android:name="presetId"
             app:argType="integer" />

@@ -2,37 +2,30 @@ package com.androidapp.pomodorotimer.data.db.preset
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.androidapp.pomodorotimer.data.model.preset.Preset
+import com.androidapp.pomodorotimer.data.model.Preset
+import com.androidapp.pomodorotimer.data.model.TriggerType
 
 @Entity(tableName = "presets")
 data class PresetEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val name: String,
-    val workMinutes: Int,
-    val shortBreakMinutes: Int,
-    val longBreakMinutes: Int,
-    val cyclesBeforeLong: Int
+    val triggerType: String,       // TriggerType.name() で保存
+    val triggerDatetime: Long?
 ) {
-    // DBのEntityをドメインモデルに変換する
     fun toPreset() = Preset(
         id = id,
         name = name,
-        workMinutes = workMinutes,
-        shortBreakMinutes = shortBreakMinutes,
-        longBreakMinutes = longBreakMinutes,
-        cyclesBeforeLong = cyclesBeforeLong
+        triggerType = TriggerType.valueOf(triggerType),
+        triggerDatetime = triggerDatetime
     )
 
     companion object {
-        // ドメインモデルからEntityに変換する
-        fun fromPreset(preset: Preset) = PresetEntity(
-            id = preset.id,
-            name = preset.name,
-            workMinutes = preset.workMinutes,
-            shortBreakMinutes = preset.shortBreakMinutes,
-            longBreakMinutes = preset.longBreakMinutes,
-            cyclesBeforeLong = preset.cyclesBeforeLong
+        fun fromPreset(p: Preset) = PresetEntity(
+            id = p.id,
+            name = p.name,
+            triggerType = p.triggerType.name,
+            triggerDatetime = p.triggerDatetime
         )
     }
 }

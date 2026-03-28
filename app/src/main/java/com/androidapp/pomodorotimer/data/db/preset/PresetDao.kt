@@ -13,7 +13,7 @@ interface PresetDao {
     suspend fun getPresetById(id: Int): PresetEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPreset(preset: PresetEntity)
+    suspend fun insertPreset(preset: PresetEntity): Long
 
     @Update
     suspend fun updatePreset(preset: PresetEntity)
