@@ -55,12 +55,12 @@ class TimerRunItemAdapter : RecyclerView.Adapter<TimerRunItemAdapter.ViewHolder>
 }
 
 private fun RoutineItem.label() = when (this) {
-    is RoutineItem.Timer -> "⏱ タイマー"
-    is RoutineItem.Alarm -> "🔔 アラーム"
-    is RoutineItem.RepeatStart -> "🔁 繰り返し始まり"
-    is RoutineItem.RepeatEnd -> "🔁 繰り返し終わり"
+    is RoutineItem.Timer          -> "⏱ タイマー"
+    is RoutineItem.Alarm          -> "🔔 アラーム"
+    is RoutineItem.LoopStart      -> "🔁 ループ開始"
+    is RoutineItem.LoopEnd        -> "🔁 ループ終了"
     is RoutineItem.ConditionStart -> "❓ 条件分岐始まり"
-    is RoutineItem.ConditionEnd -> "❓ 条件分岐終わり"
+    is RoutineItem.ConditionEnd   -> "❓ 条件分岐終わり"
 }
 
 private fun RoutineItem.summary() = when (this) {
@@ -70,6 +70,6 @@ private fun RoutineItem.summary() = when (this) {
     }
     is RoutineItem.Alarm -> "音量${volume}% / ${durationSeconds}秒" +
             if (vibrate) " / バイブあり" else ""
-    is RoutineItem.RepeatStart -> "${count}回繰り返す"
+    is RoutineItem.LoopStart -> "${count}回繰り返す"
     else -> ""
 }

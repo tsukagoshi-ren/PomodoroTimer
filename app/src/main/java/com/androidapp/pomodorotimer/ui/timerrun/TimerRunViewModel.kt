@@ -19,9 +19,9 @@ data class TimerRunUiState(
     val currentItemLabel: String = "",
     val currentItemSummary: String = "",
     val remainingSeconds: Int = 0,
-    val showTimer: Boolean = false,   // タイマーアイテムのときtrue
+    val showTimer: Boolean = false,
     val runState: RunState = RunState.IDLE,
-    val progress: Int = 0,            // 0-100
+    val progress: Int = 0,
     val totalItems: Int = 0,
     val currentIndex: Int = 0
 )
@@ -31,13 +31,11 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
     private val _uiState = MutableStateFlow(TimerRunUiState())
     val uiState: StateFlow<TimerRunUiState> = _uiState
 
-    // アラーム再生リクエストをFragmentに伝えるイベント
     private val _alarmEvent = MutableStateFlow<AlarmEvent?>(null)
     val alarmEvent: StateFlow<AlarmEvent?> = _alarmEvent
 
     data class AlarmEvent(val volume: Int, val durationSeconds: Int, val vibrate: Boolean)
 
-    // 展開済みのフラットな実行リスト（繰り返し展開後）
     private var executionList: List<RoutineItem> = emptyList()
     private var currentIndex = 0
     private var timerJob: Job? = null
@@ -71,7 +69,6 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
     fun resume() {
         if (_uiState.value.runState != RunState.PAUSED) return
         _uiState.value = _uiState.value.copy(runState = RunState.RUNNING)
-        // 残り時間から再開
         continueTimer(_uiState.value.remainingSeconds)
     }
 
@@ -91,7 +88,6 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
         when (item) {
             is RoutineItem.Timer -> continueTimer(item.durationSeconds)
             is RoutineItem.Alarm -> runAlarm(item)
-            // 繰り返し・条件分岐の始まり終わりはexpandで処理済みなので到達しないが念のため
             else -> advanceToNext()
         }
     }
@@ -153,23 +149,22 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
         return (remaining * 100 / item.durationSeconds).coerceIn(0, 100)
     }
 
-    // 繰り返しを展開して実行リストを作る
+    // ループを展開して実行リストを作る
     private fun expandRoutine(items: List<RoutineItem>): List<RoutineItem> {
         val result = mutableListOf<RoutineItem>()
         var i = 0
         while (i < items.size) {
             val item = items[i]
-            if (item is RoutineItem.RepeatStart) {
-                // 対応するRepeatEndを探す
-                val endIndex = findMatchingRepeatEnd(items, i)
+            if (item is RoutineItem.LoopStart) {
+                val endIndex = findMatchingLoopEnd(items, i)
                 if (endIndex == -1) { i++; continue }
                 val block = items.subList(i + 1, endIndex)
                 repeat(item.count) { result.addAll(expandRoutine(block)) }
                 i = endIndex + 1
-            } else if (item is RoutineItem.RepeatEnd ||
+            } else if (item is RoutineItem.LoopEnd ||
                 item is RoutineItem.ConditionStart ||
                 item is RoutineItem.ConditionEnd) {
-                i++ // 展開済みなのでスキップ
+                i++
             } else {
                 result.add(item)
                 i++
@@ -178,12 +173,12 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
         return result
     }
 
-    private fun findMatchingRepeatEnd(items: List<RoutineItem>, startIndex: Int): Int {
+    private fun findMatchingLoopEnd(items: List<RoutineItem>, startIndex: Int): Int {
         var depth = 0
         for (i in startIndex until items.size) {
             when (items[i]) {
-                is RoutineItem.RepeatStart -> depth++
-                is RoutineItem.RepeatEnd -> {
+                is RoutineItem.LoopStart -> depth++
+                is RoutineItem.LoopEnd -> {
                     depth--
                     if (depth == 0) return i
                 }
@@ -206,7 +201,6 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
     }
 }
 
-// ラベル・サマリーはViewModelでも使うのでここに定義
 private fun RoutineItem.label() = when (this) {
     is RoutineItem.Timer -> "⏱ タイマー"
     is RoutineItem.Alarm -> "🔔 アラーム"

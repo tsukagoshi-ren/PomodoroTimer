@@ -14,7 +14,7 @@ import com.androidapp.pomodorotimer.data.model.RoutineItem
             entity = PresetEntity::class,
             parentColumns = ["id"],
             childColumns = ["presetId"],
-            onDelete = ForeignKey.CASCADE  // プリセット削除時に関連アイテムも削除
+            onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [Index(value = ["presetId"])]
@@ -24,9 +24,9 @@ data class RoutineItemEntity(
     val id: Int = 0,
     val presetId: Int,
     val order: Int,
-    val type: String,              // "REPEAT_START", "REPEAT_END", etc.
+    val type: String,              // "LOOP_START", "LOOP_END", etc.
 
-    // REPEAT_START
+    // LOOP_START
     val repeatCount: Int? = null,
 
     // TIMER
@@ -39,12 +39,12 @@ data class RoutineItemEntity(
     val vibrate: Boolean? = null
 ) {
     fun toRoutineItem(): RoutineItem = when (type) {
-        "REPEAT_START" -> RoutineItem.RepeatStart(id, order, repeatCount!!)
-        "REPEAT_END"   -> RoutineItem.RepeatEnd(id, order)
+        "LOOP_START"      -> RoutineItem.LoopStart(id, order, repeatCount!!)
+        "LOOP_END"        -> RoutineItem.LoopEnd(id, order)
         "CONDITION_START" -> RoutineItem.ConditionStart(id, order)
         "CONDITION_END"   -> RoutineItem.ConditionEnd(id, order)
-        "TIMER" -> RoutineItem.Timer(id, order, durationSeconds!!)
-        "ALARM" -> RoutineItem.Alarm(
+        "TIMER"           -> RoutineItem.Timer(id, order, durationSeconds!!)
+        "ALARM"           -> RoutineItem.Alarm(
             id, order, volume!!, alarmDurationSeconds!!, soundUri!!, vibrate!!
         )
         else -> throw IllegalStateException("Unknown type: $type")
@@ -52,13 +52,13 @@ data class RoutineItemEntity(
 
     companion object {
         fun fromRoutineItem(presetId: Int, item: RoutineItem): RoutineItemEntity = when (item) {
-            is RoutineItem.RepeatStart -> RoutineItemEntity(
+            is RoutineItem.LoopStart -> RoutineItemEntity(
                 id = item.id, presetId = presetId, order = item.order,
-                type = "REPEAT_START", repeatCount = item.count
+                type = "LOOP_START", repeatCount = item.count
             )
-            is RoutineItem.RepeatEnd -> RoutineItemEntity(
+            is RoutineItem.LoopEnd -> RoutineItemEntity(
                 id = item.id, presetId = presetId, order = item.order,
-                type = "REPEAT_END"
+                type = "LOOP_END"
             )
             is RoutineItem.ConditionStart -> RoutineItemEntity(
                 id = item.id, presetId = presetId, order = item.order,

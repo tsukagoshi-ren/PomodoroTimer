@@ -25,14 +25,28 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
     }
 
     fun removeItem(item: RoutineItem) {
-        _items.value = _items.value.filter { it.id != item.id || it.order != item.order }
+        _items.value = _items.value
+            .filter { it.id != item.id || it.order != item.order }
             .mapIndexed { i, it -> reorder(it, i) }
     }
 
-    fun addRepeatStart(count: Int) = addItem(
-        RoutineItem.RepeatStart(order = 0, count = count)
-    )
-    fun addRepeatEnd() = addItem(RoutineItem.RepeatEnd(order = 0))
+    // ドラッグ&ドロップによる並び替え
+    fun moveItem(from: Int, to: Int) {
+        val list = _items.value.toMutableList()
+        if (from < 0 || to < 0 || from >= list.size || to >= list.size) return
+        val moved = list.removeAt(from)
+        list.add(to, moved)
+        _items.value = list.mapIndexed { i, item -> reorder(item, i) }
+    }
+
+    fun addLoop(count: Int) {
+        val list = _items.value.toMutableList()
+        val nextOrder = list.size
+        list.add(reorder(RoutineItem.LoopStart(order = 0, count = count), nextOrder))
+        list.add(reorder(RoutineItem.LoopEnd(order = 0), nextOrder + 1))
+        _items.value = list
+    }
+
     fun addConditionStart() = addItem(RoutineItem.ConditionStart(order = 0))
     fun addConditionEnd() = addItem(RoutineItem.ConditionEnd(order = 0))
     fun addTimer(seconds: Int) = addItem(RoutineItem.Timer(order = 0, durationSeconds = seconds))
@@ -46,8 +60,8 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
         )
     )
 
-    fun updateRepeatStart(id: Int, count: Int) = updateItem { item ->
-        if (item is RoutineItem.RepeatStart && item.id == id) item.copy(count = count) else item
+    fun updateLoopStart(id: Int, count: Int) = updateItem { item ->
+        if (item is RoutineItem.LoopStart && item.id == id) item.copy(count = count) else item
     }
     fun updateTimer(id: Int, seconds: Int) = updateItem { item ->
         if (item is RoutineItem.Timer && item.id == id) item.copy(durationSeconds = seconds) else item
@@ -75,12 +89,12 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
     }
 
     private fun reorder(item: RoutineItem, newOrder: Int): RoutineItem = when (item) {
-        is RoutineItem.RepeatStart   -> item.copy(order = newOrder)
-        is RoutineItem.RepeatEnd     -> item.copy(order = newOrder)
+        is RoutineItem.LoopStart      -> item.copy(order = newOrder)
+        is RoutineItem.LoopEnd        -> item.copy(order = newOrder)
         is RoutineItem.ConditionStart -> item.copy(order = newOrder)
-        is RoutineItem.ConditionEnd  -> item.copy(order = newOrder)
-        is RoutineItem.Timer         -> item.copy(order = newOrder)
-        is RoutineItem.Alarm         -> item.copy(order = newOrder)
+        is RoutineItem.ConditionEnd   -> item.copy(order = newOrder)
+        is RoutineItem.Timer          -> item.copy(order = newOrder)
+        is RoutineItem.Alarm          -> item.copy(order = newOrder)
     }
 
     class Factory(private val repository: PresetRepository) : ViewModelProvider.Factory {

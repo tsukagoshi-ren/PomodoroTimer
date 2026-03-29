@@ -13,7 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.androidapp.pomodorotimer.App
 import com.androidapp.pomodorotimer.data.model.RoutineItem
 import com.androidapp.pomodorotimer.databinding.FragmentRoutineEditBinding
@@ -30,8 +32,6 @@ class RoutineEditFragment : Fragment() {
 
     private lateinit var adapter: RoutineItemAdapter
 
-    // 音選択インテントの結果を受け取るコールバック
-    // アラーム編集ダイアログを開くときにここに処理をセットする
     private var onSoundPicked: ((Uri) -> Unit)? = null
 
     private val soundPickerLauncher =
@@ -63,10 +63,55 @@ class RoutineEditFragment : Fragment() {
 
         adapter = RoutineItemAdapter(
             onDelete = { item -> viewModel.removeItem(item) },
-            onEdit   = { item -> showEditDialog(item) }
+            onEdit   = { item -> showEditDialog(item) },
+            onMove   = { from, to -> viewModel.moveItem(from, to) }
         )
+
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
+
+        // ItemTouchHelper：ドラッグによる並び替え
+        val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
+        ) {
+            private var dragFrom = -1
+            private var dragTo = -1
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val from = viewHolder.adapterPosition
+                val to = target.adapterPosition
+                if (dragFrom == -1) dragFrom = from
+                dragTo = to
+                // ドラッグ中はアダプターのリストを一時的に並び替えて表示を追従させる
+                adapter.onItemMoved(from, to)
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                // スワイプ削除は使用しない
+            }
+
+            override fun clearView(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder
+            ) {
+                super.clearView(recyclerView, viewHolder)
+                // ドラッグ完了時にViewModelへ最終的な移動を通知
+                if (dragFrom != -1 && dragTo != -1 && dragFrom != dragTo) {
+                    adapter.onItemDropped(dragFrom, dragTo)
+                }
+                dragFrom = -1
+                dragTo = -1
+            }
+
+            override fun isLongPressDragEnabled(): Boolean = false  // ハンドル長押しで制御するため無効
+        })
+        touchHelper.attachToRecyclerView(binding.recyclerView)
+        adapter.itemTouchHelper = touchHelper
 
         viewModel.loadItems(presetId)
 
@@ -86,7 +131,7 @@ class RoutineEditFragment : Fragment() {
 
     private fun showAddItemDialog() {
         val options = arrayOf(
-            "繰り返し始まり", "繰り返し終わり",
+            "ループ",
             "条件分岐始まり", "条件分岐終わり",
             "タイマー", "アラーム"
         )
@@ -94,30 +139,34 @@ class RoutineEditFragment : Fragment() {
             .setTitle("アイテムを追加")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> showRepeatStartDialog()
-                    1 -> viewModel.addRepeatEnd()
-                    2 -> viewModel.addConditionStart()
-                    3 -> viewModel.addConditionEnd()
-                    4 -> showTimerDialog()
-                    5 -> showAlarmDialog()
+                    0 -> showLoopDialog()
+                    1 -> viewModel.addConditionStart()
+                    2 -> viewModel.addConditionEnd()
+                    3 -> showTimerDialog()
+                    4 -> showAlarmDialog()
                 }
             }
             .show()
     }
 
-    private fun showRepeatStartDialog(existingId: Int = 0, existingCount: Int = 3) {
+    private fun showLoopDialog(existingId: Int = 0, existingCount: Int = 3) {
         val input = android.widget.EditText(requireContext()).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setText(existingCount.toString())
             hint = "繰り返し回数"
         }
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("繰り返し回数")
+            .setTitle("ループ回数")
             .setView(input)
-            .setPositiveButton("OK") { _, _ ->
+            .setPositiveButton("追加") { _, _ ->
                 val count = input.text.toString().toIntOrNull() ?: return@setPositiveButton
-                if (existingId == 0) viewModel.addRepeatStart(count)
-                else viewModel.updateRepeatStart(existingId, count)
+                if (existingId == 0) {
+                    // 新規：ループ開始・終了を2つセットで追加
+                    viewModel.addLoop(count)
+                } else {
+                    // 編集：既存のLoopStartの回数だけ更新
+                    viewModel.updateLoopStart(existingId, count)
+                }
             }
             .setNegativeButton("キャンセル", null)
             .show()
@@ -168,7 +217,6 @@ class RoutineEditFragment : Fragment() {
         existingSoundUri: String = RingtoneManager
             .getDefaultUri(RingtoneManager.TYPE_ALARM).toString()
     ) {
-        // ダイアログ表示中に選択中のUriを保持する変数
         var currentSoundUri = existingSoundUri
 
         val layout = android.widget.LinearLayout(requireContext()).apply {
@@ -192,12 +240,10 @@ class RoutineEditFragment : Fragment() {
             text = "バイブレーション"; isChecked = existingVibrate
         }
 
-        // 音選択ボタン
         val currentName = getRingtoneName(existingSoundUri)
         val buttonSound = android.widget.Button(requireContext()).apply {
             text = "🎵 $currentName"
             setOnClickListener {
-                // コールバックをセットしてから音選択画面を起動
                 onSoundPicked = { uri ->
                     currentSoundUri = uri.toString()
                     text = "🎵 ${getRingtoneName(uri.toString())}"
@@ -240,8 +286,8 @@ class RoutineEditFragment : Fragment() {
 
     private fun showEditDialog(item: RoutineItem) {
         when (item) {
-            is RoutineItem.RepeatStart ->
-                showRepeatStartDialog(item.id, item.count)
+            is RoutineItem.LoopStart ->
+                showLoopDialog(item.id, item.count)
             is RoutineItem.Timer ->
                 showTimerDialog(item.id, item.durationSeconds)
             is RoutineItem.Alarm ->
@@ -253,7 +299,6 @@ class RoutineEditFragment : Fragment() {
         }
     }
 
-    // URIから音の名前を取得するヘルパー
     private fun getRingtoneName(uriString: String): String {
         return try {
             val uri = Uri.parse(uriString)

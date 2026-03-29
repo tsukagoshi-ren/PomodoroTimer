@@ -4,13 +4,13 @@ sealed class RoutineItem {
     abstract val id: Int
     abstract val order: Int
 
-    data class RepeatStart(
+    data class LoopStart(
         override val id: Int = 0,
         override val order: Int,
         val count: Int  // 繰り返し回数
     ) : RoutineItem()
 
-    data class RepeatEnd(
+    data class LoopEnd(
         override val id: Int = 0,
         override val order: Int
     ) : RoutineItem()
@@ -18,7 +18,6 @@ sealed class RoutineItem {
     data class ConditionStart(
         override val id: Int = 0,
         override val order: Int
-        // 条件の詳細は後で追加
     ) : RoutineItem()
 
     data class ConditionEnd(
@@ -35,7 +34,7 @@ sealed class RoutineItem {
     data class Alarm(
         override val id: Int = 0,
         override val order: Int,
-        val volume: Int,          // 0-100
+        val volume: Int,
         val durationSeconds: Int,
         val soundUri: String,
         val vibrate: Boolean
