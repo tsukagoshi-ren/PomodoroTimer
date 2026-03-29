@@ -7,20 +7,10 @@ sealed class RoutineItem {
     data class LoopStart(
         override val id: Int = 0,
         override val order: Int,
-        val count: Int  // 繰り返し回数
+        val count: Int
     ) : RoutineItem()
 
     data class LoopEnd(
-        override val id: Int = 0,
-        override val order: Int
-    ) : RoutineItem()
-
-    data class ConditionStart(
-        override val id: Int = 0,
-        override val order: Int
-    ) : RoutineItem()
-
-    data class ConditionEnd(
         override val id: Int = 0,
         override val order: Int
     ) : RoutineItem()

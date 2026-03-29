@@ -44,9 +44,7 @@ class TimerRunItemAdapter : RecyclerView.Adapter<TimerRunItemAdapter.ViewHolder>
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        ViewHolder(
-            ItemTimerRunBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        )
+        ViewHolder(ItemTimerRunBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) =
         holder.bind(items[position], position == highlightIndex)
@@ -55,21 +53,15 @@ class TimerRunItemAdapter : RecyclerView.Adapter<TimerRunItemAdapter.ViewHolder>
 }
 
 private fun RoutineItem.label() = when (this) {
-    is RoutineItem.Timer          -> "⏱ タイマー"
-    is RoutineItem.Alarm          -> "🔔 アラーム"
-    is RoutineItem.LoopStart      -> "🔁 ループ開始"
-    is RoutineItem.LoopEnd        -> "🔁 ループ終了"
-    is RoutineItem.ConditionStart -> "❓ 条件分岐始まり"
-    is RoutineItem.ConditionEnd   -> "❓ 条件分岐終わり"
+    is RoutineItem.Timer     -> "⏱ タイマー"
+    is RoutineItem.Alarm     -> "🔔 アラーム"
+    is RoutineItem.LoopStart -> "🔁 ループ開始"
+    is RoutineItem.LoopEnd   -> "🔁 ループ終了"
 }
 
 private fun RoutineItem.summary() = when (this) {
-    is RoutineItem.Timer -> {
-        val m = durationSeconds / 60; val s = durationSeconds % 60
-        if (m > 0) "${m}分${s}秒" else "${s}秒"
-    }
-    is RoutineItem.Alarm -> "音量${volume}% / ${durationSeconds}秒" +
-            if (vibrate) " / バイブあり" else ""
+    is RoutineItem.Timer     -> { val m = durationSeconds / 60; val s = durationSeconds % 60; if (m > 0) "${m}分${s}秒" else "${s}秒" }
+    is RoutineItem.Alarm     -> "音量${volume}% / ${durationSeconds}秒" + if (vibrate) " / バイブあり" else ""
     is RoutineItem.LoopStart -> "${count}回繰り返す"
     else -> ""
 }

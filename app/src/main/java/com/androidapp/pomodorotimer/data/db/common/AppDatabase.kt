@@ -13,7 +13,7 @@ import com.androidapp.pomodorotimer.data.db.routine.RoutineItemEntity
 
 @Database(
     entities = [PresetEntity::class, RoutineItemEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,15 +25,18 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var instance: AppDatabase? = null
 
-        // version 1 → 2: REPEAT_START/REPEAT_END を LOOP_START/LOOP_END に変換
+        // v1 → v2: REPEAT_* → LOOP_*
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
-                    "UPDATE routine_items SET type = 'LOOP_START' WHERE type = 'REPEAT_START'"
-                )
-                database.execSQL(
-                    "UPDATE routine_items SET type = 'LOOP_END' WHERE type = 'REPEAT_END'"
-                )
+                database.execSQL("UPDATE routine_items SET type = 'LOOP_START' WHERE type = 'REPEAT_START'")
+                database.execSQL("UPDATE routine_items SET type = 'LOOP_END'   WHERE type = 'REPEAT_END'")
+            }
+        }
+
+        // v2 → v3: CONDITION_* 行を削除
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DELETE FROM routine_items WHERE type IN ('CONDITION_START','CONDITION_END')")
             }
         }
 
@@ -44,7 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "routine_timer_database"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }

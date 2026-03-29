@@ -7,12 +7,30 @@ import com.androidapp.pomodorotimer.data.model.RoutineItem
 import com.androidapp.pomodorotimer.data.repository.PresetRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
 class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel() {
 
     private val _items = MutableStateFlow<List<RoutineItem>>(emptyList())
     val items: StateFlow<List<RoutineItem>> = _items
+
+    /**
+     * RecyclerViewに渡す表示用リスト。
+     * RoutineItemの間に AddButton を差し込んだもの。
+     *
+     * 構造例（ループあり）:
+     *   LoopStart(3回)
+     *     [AddButton(loopStartIndex=0)]  ← ループ内追加ボタン
+     *   LoopEnd
+     *   Timer
+     *   [AddButton(null)]               ← 末尾追加ボタン
+     */
+    val displayList: StateFlow<List<RoutineListEntry>> = _items
+        .map { buildDisplayList(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun loadItems(presetId: Int) {
         viewModelScope.launch {
@@ -30,7 +48,7 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
             .mapIndexed { i, it -> reorder(it, i) }
     }
 
-    // ドラッグ&ドロップによる並び替え
+    /** ドラッグ&ドロップによる並び替え（RoutineItemリスト上のインデックス） */
     fun moveItem(from: Int, to: Int) {
         val list = _items.value.toMutableList()
         if (from < 0 || to < 0 || from >= list.size || to >= list.size) return
@@ -39,26 +57,31 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
         _items.value = list.mapIndexed { i, item -> reorder(item, i) }
     }
 
-    fun addLoop(count: Int) {
+    /**
+     * ループ（開始＋終了）を追加する。
+     * [insertAfterIndex] が null の場合はリスト末尾へ、
+     * 指定した場合はその RoutineItem インデックスの直後へ挿入する。
+     */
+    fun addLoop(count: Int, insertAfterIndex: Int?) {
         val list = _items.value.toMutableList()
-        val nextOrder = list.size
-        list.add(reorder(RoutineItem.LoopStart(order = 0, count = count), nextOrder))
-        list.add(reorder(RoutineItem.LoopEnd(order = 0), nextOrder + 1))
-        _items.value = list
+        val pos = if (insertAfterIndex == null) list.size else insertAfterIndex + 1
+        list.add(pos, RoutineItem.LoopEnd(order = 0))
+        list.add(pos, RoutineItem.LoopStart(order = 0, count = count))
+        _items.value = list.mapIndexed { i, item -> reorder(item, i) }
     }
 
-    fun addConditionStart() = addItem(RoutineItem.ConditionStart(order = 0))
-    fun addConditionEnd() = addItem(RoutineItem.ConditionEnd(order = 0))
-    fun addTimer(seconds: Int) = addItem(RoutineItem.Timer(order = 0, durationSeconds = seconds))
-    fun addAlarm(volume: Int, duration: Int, soundUri: String, vibrate: Boolean) = addItem(
-        RoutineItem.Alarm(
-            order = 0,
-            volume = volume,
-            durationSeconds = duration,
-            soundUri = soundUri,
-            vibrate = vibrate
+    /**
+     * アイテムを追加する。
+     * [insertAfterIndex] が null の場合はリスト末尾、指定した場合はその直後に挿入。
+     */
+    fun addTimer(seconds: Int, insertAfterIndex: Int?) =
+        insertItem(RoutineItem.Timer(order = 0, durationSeconds = seconds), insertAfterIndex)
+
+    fun addAlarm(volume: Int, duration: Int, soundUri: String, vibrate: Boolean, insertAfterIndex: Int?) =
+        insertItem(
+            RoutineItem.Alarm(order = 0, volume = volume, durationSeconds = duration, soundUri = soundUri, vibrate = vibrate),
+            insertAfterIndex
         )
-    )
 
     fun updateLoopStart(id: Int, count: Int) = updateItem { item ->
         if (item is RoutineItem.LoopStart && item.id == id) item.copy(count = count) else item
@@ -69,19 +92,15 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
     fun updateAlarm(id: Int, volume: Int, duration: Int, soundUri: String, vibrate: Boolean) =
         updateItem { item ->
             if (item is RoutineItem.Alarm && item.id == id)
-                item.copy(
-                    volume = volume,
-                    durationSeconds = duration,
-                    soundUri = soundUri,
-                    vibrate = vibrate
-                )
+                item.copy(volume = volume, durationSeconds = duration, soundUri = soundUri, vibrate = vibrate)
             else item
         }
 
-    private fun addItem(item: RoutineItem) {
+    private fun insertItem(item: RoutineItem, insertAfterIndex: Int?) {
         val list = _items.value.toMutableList()
-        list.add(reorder(item, list.size))
-        _items.value = list
+        val pos = if (insertAfterIndex == null) list.size else insertAfterIndex + 1
+        list.add(pos, item)
+        _items.value = list.mapIndexed { i, it -> reorder(it, i) }
     }
 
     private fun updateItem(transform: (RoutineItem) -> RoutineItem) {
@@ -89,12 +108,46 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
     }
 
     private fun reorder(item: RoutineItem, newOrder: Int): RoutineItem = when (item) {
-        is RoutineItem.LoopStart      -> item.copy(order = newOrder)
-        is RoutineItem.LoopEnd        -> item.copy(order = newOrder)
-        is RoutineItem.ConditionStart -> item.copy(order = newOrder)
-        is RoutineItem.ConditionEnd   -> item.copy(order = newOrder)
-        is RoutineItem.Timer          -> item.copy(order = newOrder)
-        is RoutineItem.Alarm          -> item.copy(order = newOrder)
+        is RoutineItem.LoopStart -> item.copy(order = newOrder)
+        is RoutineItem.LoopEnd   -> item.copy(order = newOrder)
+        is RoutineItem.Timer     -> item.copy(order = newOrder)
+        is RoutineItem.Alarm     -> item.copy(order = newOrder)
+    }
+
+    /**
+     * RoutineItem リストから、AddButton を差し込んだ表示用リストを構築する。
+     *
+     * ルール:
+     * - LoopStart の直後（LoopEnd の前）に「ループ内追加ボタン」を挿入する
+     * - リストの末尾に「末尾追加ボタン」を挿入する
+     */
+    private fun buildDisplayList(items: List<RoutineItem>): List<RoutineListEntry> {
+        val result = mutableListOf<RoutineListEntry>()
+
+        // LoopStartのインデックスをスタックで管理（ネスト対応）
+        val loopStartIndexStack = ArrayDeque<Int>() // itemsリスト上のindex
+
+        for (i in items.indices) {
+            val item = items[i]
+            result.add(RoutineListEntry.Item(item))
+
+            when (item) {
+                is RoutineItem.LoopStart -> {
+                    loopStartIndexStack.addLast(i)
+                    // LoopStart直後にループ内追加ボタンを追加
+                    result.add(RoutineListEntry.AddButton(insertAfterIndex = i))
+                }
+                is RoutineItem.LoopEnd -> {
+                    if (loopStartIndexStack.isNotEmpty()) loopStartIndexStack.removeLast()
+                }
+                else -> {}
+            }
+        }
+
+        // 末尾追加ボタン
+        result.add(RoutineListEntry.AddButton(insertAfterIndex = null))
+
+        return result
     }
 
     class Factory(private val repository: PresetRepository) : ViewModelProvider.Factory {

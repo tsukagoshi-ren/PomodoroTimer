@@ -24,29 +24,20 @@ data class RoutineItemEntity(
     val id: Int = 0,
     val presetId: Int,
     val order: Int,
-    val type: String,              // "LOOP_START", "LOOP_END", etc.
+    val type: String,
 
-    // LOOP_START
     val repeatCount: Int? = null,
-
-    // TIMER
     val durationSeconds: Int? = null,
-
-    // ALARM
     val volume: Int? = null,
     val alarmDurationSeconds: Int? = null,
     val soundUri: String? = null,
     val vibrate: Boolean? = null
 ) {
     fun toRoutineItem(): RoutineItem = when (type) {
-        "LOOP_START"      -> RoutineItem.LoopStart(id, order, repeatCount!!)
-        "LOOP_END"        -> RoutineItem.LoopEnd(id, order)
-        "CONDITION_START" -> RoutineItem.ConditionStart(id, order)
-        "CONDITION_END"   -> RoutineItem.ConditionEnd(id, order)
-        "TIMER"           -> RoutineItem.Timer(id, order, durationSeconds!!)
-        "ALARM"           -> RoutineItem.Alarm(
-            id, order, volume!!, alarmDurationSeconds!!, soundUri!!, vibrate!!
-        )
+        "LOOP_START" -> RoutineItem.LoopStart(id, order, repeatCount!!)
+        "LOOP_END"   -> RoutineItem.LoopEnd(id, order)
+        "TIMER"      -> RoutineItem.Timer(id, order, durationSeconds!!)
+        "ALARM"      -> RoutineItem.Alarm(id, order, volume!!, alarmDurationSeconds!!, soundUri!!, vibrate!!)
         else -> throw IllegalStateException("Unknown type: $type")
     }
 
@@ -59,14 +50,6 @@ data class RoutineItemEntity(
             is RoutineItem.LoopEnd -> RoutineItemEntity(
                 id = item.id, presetId = presetId, order = item.order,
                 type = "LOOP_END"
-            )
-            is RoutineItem.ConditionStart -> RoutineItemEntity(
-                id = item.id, presetId = presetId, order = item.order,
-                type = "CONDITION_START"
-            )
-            is RoutineItem.ConditionEnd -> RoutineItemEntity(
-                id = item.id, presetId = presetId, order = item.order,
-                type = "CONDITION_END"
             )
             is RoutineItem.Timer -> RoutineItemEntity(
                 id = item.id, presetId = presetId, order = item.order,

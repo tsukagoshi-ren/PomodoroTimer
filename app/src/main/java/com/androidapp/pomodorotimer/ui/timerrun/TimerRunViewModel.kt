@@ -84,8 +84,7 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
             _uiState.value = _uiState.value.copy(runState = RunState.FINISHED)
             return
         }
-        val item = executionList[currentIndex]
-        when (item) {
+        when (val item = executionList[currentIndex]) {
             is RoutineItem.Timer -> continueTimer(item.durationSeconds)
             is RoutineItem.Alarm -> runAlarm(item)
             else -> advanceToNext()
@@ -149,7 +148,6 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
         return (remaining * 100 / item.durationSeconds).coerceIn(0, 100)
     }
 
-    // ループを展開して実行リストを作る
     private fun expandRoutine(items: List<RoutineItem>): List<RoutineItem> {
         val result = mutableListOf<RoutineItem>()
         var i = 0
@@ -161,9 +159,7 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
                 val block = items.subList(i + 1, endIndex)
                 repeat(item.count) { result.addAll(expandRoutine(block)) }
                 i = endIndex + 1
-            } else if (item is RoutineItem.LoopEnd ||
-                item is RoutineItem.ConditionStart ||
-                item is RoutineItem.ConditionEnd) {
+            } else if (item is RoutineItem.LoopEnd) {
                 i++
             } else {
                 result.add(item)
@@ -178,10 +174,7 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
         for (i in startIndex until items.size) {
             when (items[i]) {
                 is RoutineItem.LoopStart -> depth++
-                is RoutineItem.LoopEnd -> {
-                    depth--
-                    if (depth == 0) return i
-                }
+                is RoutineItem.LoopEnd   -> { depth--; if (depth == 0) return i }
                 else -> {}
             }
         }
@@ -202,9 +195,10 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
 }
 
 private fun RoutineItem.label() = when (this) {
-    is RoutineItem.Timer -> "⏱ タイマー"
-    is RoutineItem.Alarm -> "🔔 アラーム"
-    else -> ""
+    is RoutineItem.Timer     -> "⏱ タイマー"
+    is RoutineItem.Alarm     -> "🔔 アラーム"
+    is RoutineItem.LoopStart -> "🔁 ループ開始"
+    is RoutineItem.LoopEnd   -> "🔁 ループ終了"
 }
 
 private fun RoutineItem.summary() = when (this) {
@@ -212,6 +206,7 @@ private fun RoutineItem.summary() = when (this) {
         val m = durationSeconds / 60; val s = durationSeconds % 60
         if (m > 0) "${m}分${s}秒" else "${s}秒"
     }
-    is RoutineItem.Alarm -> "音量${volume}% / ${durationSeconds}秒"
+    is RoutineItem.Alarm     -> "音量${volume}% / ${durationSeconds}秒"
+    is RoutineItem.LoopStart -> "${count}回繰り返す"
     else -> ""
 }
