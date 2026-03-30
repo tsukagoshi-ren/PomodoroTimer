@@ -6,6 +6,7 @@
     android:layout_height="wrap_content"
     android:paddingTop="10dp"
     android:paddingBottom="10dp"
+    android:paddingStart="0dp"
     android:paddingEnd="4dp"
     android:background="?attr/selectableItemBackground">
 

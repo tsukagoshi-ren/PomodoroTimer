@@ -1,7 +1,6 @@
 package com.androidapp.pomodorotimer.ui.routineedit
 
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -37,21 +36,25 @@ class RoutineItemAdapter(
             binding.textItemType.text = item.label()
             binding.textItemSummary.text = item.summary()
 
+            // depth に応じて行全体を左インデント（1段あたり24dp）
+            val indentPx = (entry.depth * 24 *
+                    binding.root.context.resources.displayMetrics.density).toInt()
+            binding.root.setPadding(
+                indentPx,
+                binding.root.paddingTop,
+                binding.root.paddingRight,
+                binding.root.paddingBottom
+            )
+
             binding.buttonEdit.visibility =
                 if (item.isEditable()) android.view.View.VISIBLE else android.view.View.GONE
             binding.buttonEdit.setOnClickListener { onEdit(item) }
             binding.buttonDelete.setOnClickListener { onDelete(item) }
 
-            // ドラッグハンドルの長押し or タッチでドラッグ開始
+            // ドラッグハンドルの長押しでドラッグ開始
             binding.dragHandle.setOnLongClickListener {
                 itemTouchHelper?.startDrag(this)
                 true
-            }
-            binding.dragHandle.setOnTouchListener { _, event ->
-                if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-                    itemTouchHelper?.startDrag(this)
-                }
-                false
             }
         }
     }

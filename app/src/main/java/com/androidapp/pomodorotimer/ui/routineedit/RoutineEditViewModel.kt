@@ -118,34 +118,46 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
      * RoutineItem リストから、AddButton を差し込んだ表示用リストを構築する。
      *
      * ルール:
-     * - LoopStart の直後（LoopEnd の前）に「ループ内追加ボタン」を挿入する
+     * - LoopEnd の直前に「ループ内追加ボタン」を挿入する（ループ内の末尾）
      * - リストの末尾に「末尾追加ボタン」を挿入する
+     * - LoopStart/LoopEnd 自体は depth=0、ループ内アイテムは depth=1以上
      */
     private fun buildDisplayList(items: List<RoutineItem>): List<RoutineListEntry> {
         val result = mutableListOf<RoutineListEntry>()
 
-        // LoopStartのインデックスをスタックで管理（ネスト対応）
-        val loopStartIndexStack = ArrayDeque<Int>() // itemsリスト上のindex
+        // 現在のネスト深さを追跡するスタック（LoopStartのitemsインデックスを積む）
+        val loopStartIndexStack = ArrayDeque<Int>()
 
         for (i in items.indices) {
             val item = items[i]
-            result.add(RoutineListEntry.Item(item))
+            val currentDepth = loopStartIndexStack.size
 
             when (item) {
                 is RoutineItem.LoopStart -> {
+                    // LoopStart自体はdepth=currentDepth（外側の深さ）で追加
+                    result.add(RoutineListEntry.Item(item, depth = currentDepth))
                     loopStartIndexStack.addLast(i)
-                    // LoopStart直後にループ内追加ボタンを追加
-                    result.add(RoutineListEntry.AddButton(insertAfterIndex = i))
                 }
                 is RoutineItem.LoopEnd -> {
-                    if (loopStartIndexStack.isNotEmpty()) loopStartIndexStack.removeLast()
+                    // LoopEnd直前にループ内追加ボタンを挿入
+                    // insertAfterIndex: このLoopEndの直前 = インデックスi-1の後
+                    val innerDepth = currentDepth  // ループ内の深さ
+                    result.add(RoutineListEntry.AddButton(
+                        insertAfterIndex = i - 1,
+                        depth = innerDepth
+                    ))
+                    loopStartIndexStack.removeLastOrNull()
+                    // LoopEnd自体はdepth=loopStartIndexStack.size（抜けた後の深さ）
+                    result.add(RoutineListEntry.Item(item, depth = loopStartIndexStack.size))
                 }
-                else -> {}
+                else -> {
+                    result.add(RoutineListEntry.Item(item, depth = currentDepth))
+                }
             }
         }
 
-        // 末尾追加ボタン
-        result.add(RoutineListEntry.AddButton(insertAfterIndex = null))
+        // 末尾追加ボタン（depth=0、ループ外）
+        result.add(RoutineListEntry.AddButton(insertAfterIndex = null, depth = 0))
 
         return result
     }
