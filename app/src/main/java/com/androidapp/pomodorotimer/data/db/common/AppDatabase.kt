@@ -13,7 +13,7 @@ import com.androidapp.pomodorotimer.data.db.routine.RoutineItemEntity
 
 @Database(
     entities = [PresetEntity::class, RoutineItemEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,7 +25,6 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var instance: AppDatabase? = null
 
-        // v1 → v2: REPEAT_* → LOOP_*
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("UPDATE routine_items SET type = 'LOOP_START' WHERE type = 'REPEAT_START'")
@@ -33,10 +32,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // v2 → v3: CONDITION_* 行を削除
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("DELETE FROM routine_items WHERE type IN ('CONDITION_START','CONDITION_END')")
+            }
+        }
+
+        // v3 → v4: tickSound カラム追加
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE routine_items ADD COLUMN tickSound TEXT")
             }
         }
 
@@ -47,7 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "routine_timer_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

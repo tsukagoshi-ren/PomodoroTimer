@@ -13,9 +13,7 @@ import com.androidapp.pomodorotimer.databinding.ItemRoutineAddButtonBinding
 class RoutineItemAdapter(
     private val onDelete: (RoutineItem) -> Unit,
     private val onEdit: (RoutineItem) -> Unit,
-    /** AddButtonがタップされたとき呼ばれる。insertAfterIndex はViewModelと同じ意味 */
     private val onAddButtonClick: (insertAfterIndex: Int?) -> Unit,
-    /** ドラッグ完了時に呼ばれる。from/to はRoutineItemリスト上のインデックス */
     private val onMove: (from: Int, to: Int) -> Unit
 ) : ListAdapter<RoutineListEntry, RecyclerView.ViewHolder>(RoutineDiffCallback) {
 
@@ -26,8 +24,6 @@ class RoutineItemAdapter(
         private const val TYPE_ADD_BUTTON = 1
     }
 
-    // ---- ViewHolders ----
-
     inner class ItemViewHolder(private val binding: ItemRoutineBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
@@ -36,7 +32,6 @@ class RoutineItemAdapter(
             binding.textItemType.text = item.label()
             binding.textItemSummary.text = item.summary()
 
-            // depth に応じて行全体を左インデント（1段あたり24dp）
             val indentPx = (entry.depth * 24 *
                     binding.root.context.resources.displayMetrics.density).toInt()
             binding.root.setPadding(
@@ -51,7 +46,6 @@ class RoutineItemAdapter(
             binding.buttonEdit.setOnClickListener { onEdit(item) }
             binding.buttonDelete.setOnClickListener { onDelete(item) }
 
-            // ドラッグハンドルの長押しでドラッグ開始
             binding.dragHandle.setOnLongClickListener {
                 itemTouchHelper?.startDrag(this)
                 true
@@ -68,8 +62,6 @@ class RoutineItemAdapter(
             }
         }
     }
-
-    // ---- ListAdapter overrides ----
 
     override fun getItemViewType(position: Int): Int = when (getItem(position)) {
         is RoutineListEntry.Item      -> TYPE_ITEM
@@ -93,9 +85,6 @@ class RoutineItemAdapter(
         }
     }
 
-    // ---- ドラッグ中の一時的な並び替え表示 ----
-
-    /** displayListエントリのインデックスをRoutineItemリスト上のインデックスに変換 */
     private fun toItemIndex(displayIndex: Int): Int {
         var itemCount = 0
         for (i in 0 until displayIndex) {
@@ -112,10 +101,8 @@ class RoutineItemAdapter(
     }
 
     fun onItemDropped(fromDisplay: Int, toDisplay: Int) {
-        // displayListのインデックスをRoutineItemリスト上のインデックスに変換して通知
         onMove(toItemIndex(fromDisplay), toItemIndex(toDisplay))
     }
-
 }
 
 private object RoutineDiffCallback : DiffUtil.ItemCallback<RoutineListEntry>() {
@@ -130,8 +117,6 @@ private object RoutineDiffCallback : DiffUtil.ItemCallback<RoutineListEntry>() {
     override fun areContentsTheSame(a: RoutineListEntry, b: RoutineListEntry) = a == b
 }
 
-// ---- 拡張関数 ----
-
 private fun RoutineItem.label() = when (this) {
     is RoutineItem.LoopStart -> "🔁 ループ開始"
     is RoutineItem.LoopEnd   -> "🔁 ループ終了"
@@ -143,7 +128,9 @@ private fun RoutineItem.summary() = when (this) {
     is RoutineItem.LoopStart -> "${count}回繰り返す"
     is RoutineItem.Timer -> {
         val m = durationSeconds / 60; val s = durationSeconds % 60
-        if (m > 0) "${m}分${s}秒" else "${s}秒"
+        val timeStr = if (m > 0) "${m}分${s}秒" else "${s}秒"
+        val tickStr = if (tickSound != null) " / ティック: $tickSound" else ""
+        timeStr + tickStr
     }
     is RoutineItem.Alarm -> "音量${volume}% / ${durationSeconds}秒" +
             (if (vibrate) " / バイブあり" else "")

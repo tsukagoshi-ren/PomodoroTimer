@@ -7,7 +7,9 @@ import com.androidapp.pomodorotimer.data.model.RoutineItem
 import com.androidapp.pomodorotimer.data.repository.PresetRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -33,6 +35,10 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
 
     private val _alarmEvent = MutableStateFlow<AlarmEvent?>(null)
     val alarmEvent: StateFlow<AlarmEvent?> = _alarmEvent
+
+    // ティック音イベント: リソース名（"tick_clock" 等）を毎秒emit。null = 無音
+    private val _tickEvent = MutableSharedFlow<String?>(extraBufferCapacity = 1)
+    val tickEvent: SharedFlow<String?> = _tickEvent
 
     data class AlarmEvent(val volume: Int, val durationSeconds: Int, val vibrate: Boolean)
 
@@ -93,6 +99,8 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
 
     private fun continueTimer(seconds: Int) {
         timerJob?.cancel()
+        // 現在アイテムのticksoundを取得
+        val tickSound = (executionList.getOrNull(currentIndex) as? RoutineItem.Timer)?.tickSound
         timerJob = viewModelScope.launch {
             var remaining = seconds
             while (remaining > 0) {
@@ -100,6 +108,8 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
                     remainingSeconds = remaining,
                     progress = calcProgress(remaining)
                 )
+                // ティック音をemit（一時停止からの再開時も含む）
+                _tickEvent.tryEmit(tickSound)
                 delay(1000)
                 remaining--
             }

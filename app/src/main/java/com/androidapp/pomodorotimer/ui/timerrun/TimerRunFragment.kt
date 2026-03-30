@@ -1,7 +1,9 @@
 package com.androidapp.pomodorotimer.ui.timerrun
 
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.RingtoneManager
+import android.media.SoundPool
 import android.os.*
 import android.view.LayoutInflater
 import android.view.View
@@ -24,7 +26,14 @@ class TimerRunFragment : Fragment() {
     }
 
     private lateinit var adapter: TimerRunItemAdapter
+
+    // --- アラーム再生 ---
     private var ringtone: android.media.Ringtone? = null
+
+    // --- ティック音用 SoundPool ---
+    private var soundPool: SoundPool? = null
+    // リソース名 → soundId のキャッシュ
+    private val soundIdCache = mutableMapOf<String, Int>()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -35,6 +44,8 @@ class TimerRunFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        initSoundPool()
 
         val presetId = arguments?.getInt("presetId") ?: return
         viewModel.load(presetId)
@@ -47,18 +58,14 @@ class TimerRunFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.uiState.collect { state ->
                 binding.textPresetName.text = state.presetName
-
-                // アイテムリストをアダプターに渡す（ハイライト位置付き）
                 adapter.submitList(state.executionList, state.currentIndex)
 
-                // 現在位置へスクロール
                 if (state.executionList.isNotEmpty()) {
                     binding.recyclerView.scrollToPosition(
                         state.currentIndex.coerceIn(0, state.executionList.size - 1)
                     )
                 }
 
-                // タイマー表示
                 if (state.showTimer) {
                     val m = state.remainingSeconds / 60
                     val s = state.remainingSeconds % 60
@@ -71,7 +78,6 @@ class TimerRunFragment : Fragment() {
                     binding.progressBar.visibility = View.GONE
                 }
 
-                // ボタン状態
                 when (state.runState) {
                     RunState.IDLE -> {
                         binding.buttonStart.text = "開始"
@@ -103,7 +109,7 @@ class TimerRunFragment : Fragment() {
             }
         }
 
-        // アラームイベントの監視
+        // アラームイベント
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.alarmEvent.collect { event ->
                 if (event != null) playAlarm(event)
@@ -111,9 +117,16 @@ class TimerRunFragment : Fragment() {
             }
         }
 
+        // ティック音イベント
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.tickEvent.collect { resourceName ->
+                if (resourceName != null) playTick(resourceName)
+            }
+        }
+
         binding.buttonStart.setOnClickListener {
             when (viewModel.uiState.value.runState) {
-                RunState.IDLE -> viewModel.start()
+                RunState.IDLE   -> viewModel.start()
                 RunState.PAUSED -> viewModel.resume()
                 else -> {}
             }
@@ -121,6 +134,39 @@ class TimerRunFragment : Fragment() {
         binding.buttonPause.setOnClickListener { viewModel.pause() }
         binding.buttonStop.setOnClickListener { viewModel.stop(); stopAlarm() }
     }
+
+    // ---- SoundPool 初期化 ----
+
+    private fun initSoundPool() {
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        soundPool = SoundPool.Builder()
+            .setMaxStreams(2)
+            .setAudioAttributes(attrs)
+            .build()
+    }
+
+    /**
+     * リソース名（例: "tick_clock"）から soundId を解決して再生する。
+     * 初回は load、以降はキャッシュから再生。
+     */
+    private fun playTick(resourceName: String) {
+        val pool = soundPool ?: return
+        val ctx = context ?: return
+
+        val soundId = soundIdCache.getOrPut(resourceName) {
+            val resId = ctx.resources.getIdentifier(resourceName, "raw", ctx.packageName)
+            if (resId == 0) return   // リソースが見つからない場合はスキップ
+            pool.load(ctx, resId, 1)
+        }
+        // load直後は再生できないが、2回目以降はキャッシュ済みなので即再生される
+        // 初回のみ遅延が出る可能性があるが、実用上問題ない
+        pool.play(soundId, 0.8f, 0.8f, 1, 0, 1.0f)
+    }
+
+    // ---- アラーム再生 ----
 
     private fun playAlarm(event: TimerRunViewModel.AlarmEvent) {
         stopAlarm()
@@ -168,6 +214,9 @@ class TimerRunFragment : Fragment() {
 
     override fun onDestroyView() {
         stopAlarm()
+        soundPool?.release()
+        soundPool = null
+        soundIdCache.clear()
         super.onDestroyView()
         _binding = null
     }
