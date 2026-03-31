@@ -12,6 +12,7 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.NumberPicker
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
@@ -54,15 +55,13 @@ class RoutineEditFragment : Fragment() {
             }
         }
 
-    // ティック音の選択肢定義
-    // Pair(表示名, リソース名) — リソース名 null = 無音
     private val tickSoundOptions: List<Pair<String, String?>> = listOf(
-        "なし"             to null,
-        "🕐 時計（カチッ）" to "tick_clock",
-        "🪵 木製（コン）"   to "tick_wood",
-        "🔔 ベル（リン）"   to "tick_bell",
-        "📳 ソフト（ポッ）" to "tick_soft",
-        "📳 ビープ（ピッ）" to "tick_beep",
+        "なし"               to null,
+        "🕐 時計（カチッ）"  to "tick_clock",
+        "🪵 木製（コン）"    to "tick_wood",
+        "🔔 ベル（リン）"    to "tick_bell",
+        "📳 ソフト（ポッ）"  to "tick_soft",
+        "📳 ビープ（ピッ）"  to "tick_beep",
         "🎮 デジタル（ブッ）" to "tick_digital",
     )
 
@@ -187,8 +186,7 @@ class RoutineEditFragment : Fragment() {
     }
 
     /**
-     * タイマーダイアログ。
-     * 分・秒入力に加え、ティック音の選択ボタンを追加。
+     * タイマーダイアログ — 時・分・秒の NumberPicker 3列 + ティック音選択
      */
     private fun showTimerDialog(
         existingId: Int = 0,
@@ -198,50 +196,80 @@ class RoutineEditFragment : Fragment() {
     ) {
         var selectedTickSound: String? = existingTickSound
 
-        val layout = android.widget.LinearLayout(requireContext()).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(48, 16, 48, 0)
-        }
+        val initH = existingSeconds / 3600
+        val initM = (existingSeconds % 3600) / 60
+        val initS = existingSeconds % 60
 
-        // 分・秒入力
-        val timeRow = android.widget.LinearLayout(requireContext()).apply {
+        val ctx = requireContext()
+        val dp = ctx.resources.displayMetrics.density
+
+        // ---- NumberPicker 3列レイアウト ----
+        val pickerRow = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
-        }
-        val editMin = android.widget.EditText(requireContext()).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText((existingSeconds / 60).toString()); hint = "分"
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val editSec = android.widget.EditText(requireContext()).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText((existingSeconds % 60).toString()); hint = "秒"
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        timeRow.addView(editMin)
-        timeRow.addView(android.widget.TextView(requireContext()).apply { text = " : " })
-        timeRow.addView(editSec)
-
-        // ティック音ラベル
-        val tickLabel = android.widget.TextView(requireContext()).apply {
-            text = "ティック音"
-            setPadding(0, 24, 0, 4)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, (16 * dp).toInt(), 0, 0)
         }
 
-        // ティック音選択ボタン（タップで選択ダイアログを開く）
-        fun tickDisplayName(resName: String?): String =
+        fun makePicker(max: Int, init: Int, labelText: String): android.widget.LinearLayout {
+            val col = android.widget.LinearLayout(ctx).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                )
+            }
+            val picker = NumberPicker(ctx).apply {
+                minValue = 0
+                maxValue = max
+                value = init
+                wrapSelectorWheel = true
+            }
+            val label = android.widget.TextView(ctx).apply {
+                text = labelText
+                gravity = android.view.Gravity.CENTER
+                setTextColor(
+                    ctx.obtainStyledAttributes(intArrayOf(android.R.attr.textColorSecondary))
+                        .getColor(0, 0x888888).also { it }
+                )
+                textSize = 12f
+            }
+            col.addView(picker)
+            col.addView(label)
+            return col
+        }
+
+        val colH = makePicker(23, initH, "時間")
+        val colM = makePicker(59, initM, "分")
+        val colS = makePicker(59, initS, "秒")
+
+        pickerRow.addView(colH)
+        pickerRow.addView(colM)
+        pickerRow.addView(colS)
+
+        // ---- ティック音選択 ----
+        fun tickDisplayName(resName: String?) =
             tickSoundOptions.firstOrNull { it.second == resName }?.first ?: "なし"
 
-        val buttonTick = android.widget.Button(requireContext()).apply {
+        val tickRow = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
+        }
+        val tickLabelView = android.widget.TextView(ctx).apply {
+            text = "ティック音"
+            textSize = 14f
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        val buttonTick = android.widget.Button(ctx).apply {
             text = tickDisplayName(selectedTickSound)
             setOnClickListener {
                 val names = tickSoundOptions.map { it.first }.toTypedArray()
-                val currentIndex = tickSoundOptions.indexOfFirst { it.second == selectedTickSound }
-                    .coerceAtLeast(0)
-                androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                val currentIdx = tickSoundOptions.indexOfFirst { it.second == selectedTickSound }.coerceAtLeast(0)
+                androidx.appcompat.app.AlertDialog.Builder(ctx)
                     .setTitle("ティック音を選択")
-                    .setSingleChoiceItems(names, currentIndex) { dialog, which ->
+                    .setSingleChoiceItems(names, currentIdx) { dialog, which ->
                         selectedTickSound = tickSoundOptions[which].second
                         text = tickSoundOptions[which].first
                         dialog.dismiss()
@@ -250,17 +278,25 @@ class RoutineEditFragment : Fragment() {
                     .show()
             }
         }
+        tickRow.addView(tickLabelView)
+        tickRow.addView(buttonTick)
 
-        layout.addView(timeRow)
-        layout.addView(tickLabel)
-        layout.addView(buttonTick)
+        // ---- 外枠レイアウト ----
+        val layout = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(pickerRow)
+            addView(tickRow)
+        }
 
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("タイマー（分：秒）")
+        val pickerH = (colH.getChildAt(0) as NumberPicker)
+        val pickerM = (colM.getChildAt(0) as NumberPicker)
+        val pickerS = (colS.getChildAt(0) as NumberPicker)
+
+        androidx.appcompat.app.AlertDialog.Builder(ctx)
+            .setTitle("タイマー時間")
             .setView(layout)
             .setPositiveButton("OK") { _, _ ->
-                val total = (editMin.text.toString().toIntOrNull() ?: 0) * 60 +
-                        (editSec.text.toString().toIntOrNull() ?: 0)
+                val total = pickerH.value * 3600 + pickerM.value * 60 + pickerS.value
                 if (total <= 0) return@setPositiveButton
                 if (existingId == 0) viewModel.addTimer(total, selectedTickSound, insertAfterIndex)
                 else                 viewModel.updateTimer(existingId, total, selectedTickSound)
@@ -269,6 +305,9 @@ class RoutineEditFragment : Fragment() {
             .show()
     }
 
+    /**
+     * アラームダイアログ — 鳴る秒数を NumberPicker（分・秒）に変更
+     */
     private fun showAlarmDialog(
         existingId: Int = 0,
         existingVolume: Int = 80,
@@ -278,25 +317,70 @@ class RoutineEditFragment : Fragment() {
         insertAfterIndex: Int? = null
     ) {
         var currentSoundUri = existingSoundUri
-        val layout = android.widget.LinearLayout(requireContext()).apply {
+        val ctx = requireContext()
+        val dp = ctx.resources.displayMetrics.density
+
+        val initM = existingDuration / 60
+        val initS = existingDuration % 60
+
+        val layout = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(48, 16, 48, 0)
+            setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), 0)
         }
-        fun label(text: String) = android.widget.TextView(requireContext()).apply {
-            this.text = text; setPadding(0, 16, 0, 0)
+
+        fun label(text: String) = android.widget.TextView(ctx).apply {
+            this.text = text
+            setPadding(0, (12 * dp).toInt(), 0, (4 * dp).toInt())
+            textSize = 13f
         }
-        val editVolume = android.widget.EditText(requireContext()).apply {
+
+        // 音量
+        val editVolume = android.widget.EditText(ctx).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText(existingVolume.toString()); hint = "音量（0-100）"
+            setText(existingVolume.toString())
+            hint = "音量（0-100）"
         }
-        val editDuration = android.widget.EditText(requireContext()).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText(existingDuration.toString()); hint = "鳴る秒数"
+
+        // 鳴る時間：分・秒 NumberPicker
+        val durationLabel = label("鳴る時間")
+
+        val pickerRow = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
         }
-        val checkVibrate = android.widget.CheckBox(requireContext()).apply {
+
+        fun makePicker(max: Int, init: Int, labelText: String): android.widget.LinearLayout {
+            val col = android.widget.LinearLayout(ctx).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                )
+            }
+            val picker = NumberPicker(ctx).apply {
+                minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true
+            }
+            val lbl = android.widget.TextView(ctx).apply {
+                text = labelText; gravity = android.view.Gravity.CENTER; textSize = 12f
+            }
+            col.addView(picker); col.addView(lbl)
+            return col
+        }
+
+        val colM = makePicker(59, initM, "分")
+        val colS = makePicker(59, initS, "秒")
+        pickerRow.addView(colM)
+        pickerRow.addView(colS)
+
+        val pickerM = colM.getChildAt(0) as NumberPicker
+        val pickerS = colS.getChildAt(0) as NumberPicker
+
+        // アラーム音・バイブ
+        val checkVibrate = android.widget.CheckBox(ctx).apply {
             text = "バイブレーション"; isChecked = existingVibrate
+            setPadding(0, (8 * dp).toInt(), 0, 0)
         }
-        val buttonSound = android.widget.Button(requireContext()).apply {
+        val buttonSound = android.widget.Button(ctx).apply {
             text = "🎵 ${getRingtoneName(existingSoundUri)}"
             setOnClickListener {
                 onSoundPicked = { uri ->
@@ -312,17 +396,22 @@ class RoutineEditFragment : Fragment() {
                 })
             }
         }
-        layout.addView(label("音量（0〜100）")); layout.addView(editVolume)
-        layout.addView(label("鳴る秒数"));     layout.addView(editDuration)
-        layout.addView(label("アラーム音"));   layout.addView(buttonSound)
+
+        layout.addView(label("音量（0〜100）"))
+        layout.addView(editVolume)
+        layout.addView(durationLabel)
+        layout.addView(pickerRow)
+        layout.addView(label("アラーム音"))
+        layout.addView(buttonSound)
         layout.addView(checkVibrate)
 
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+        androidx.appcompat.app.AlertDialog.Builder(ctx)
             .setTitle("アラーム設定")
             .setView(layout)
             .setPositiveButton("OK") { _, _ ->
                 val vol = editVolume.text.toString().toIntOrNull()?.coerceIn(0, 100) ?: return@setPositiveButton
-                val dur = editDuration.text.toString().toIntOrNull() ?: return@setPositiveButton
+                val dur = pickerM.value * 60 + pickerS.value
+                if (dur <= 0) return@setPositiveButton
                 val vib = checkVibrate.isChecked
                 if (existingId == 0) viewModel.addAlarm(vol, dur, currentSoundUri, vib, insertAfterIndex)
                 else                 viewModel.updateAlarm(existingId, vol, dur, currentSoundUri, vib)
