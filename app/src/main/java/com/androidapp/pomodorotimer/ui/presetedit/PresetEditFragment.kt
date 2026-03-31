@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -45,8 +46,19 @@ class PresetEditFragment : Fragment() {
         val presetId = arguments?.getInt("presetId", -1) ?: -1
         if (presetId != -1) viewModel.loadPreset(presetId)
 
+        // システムの「戻る」ボタンもキャンセル扱いにする
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    performCancel()
+                }
+            }
+        )
+
         binding.rowTrigger.setOnClickListener { showTriggerDialog() }
 
+        // ルーティン編集へ遷移（saveAndGetId でID確保）
         binding.rowRoutine.setOnClickListener {
             viewModel.setName(binding.editName.text.toString().trim())
             viewLifecycleOwner.lifecycleScope.launch {
@@ -62,19 +74,21 @@ class PresetEditFragment : Fragment() {
             }
         }
 
-        // キャンセルボタン：保存せずに戻る
-        binding.buttonCancel.setOnClickListener {
-            findNavController().popBackStack()
-        }
+        // キャンセルボタン
+        binding.buttonCancel.setOnClickListener { performCancel() }
 
         // 保存ボタン
         binding.buttonSave.setOnClickListener {
-            val name = binding.editName.text.toString().trim()
-            viewModel.setName(name)
+            viewModel.setName(binding.editName.text.toString().trim())
             viewLifecycleOwner.lifecycleScope.launch {
-                val ok = viewModel.save()
-                if (ok) findNavController().popBackStack()
-                else Toast.makeText(requireContext(), "プリセット名を入力してください", Toast.LENGTH_SHORT).show()
+                when (viewModel.save()) {
+                    PresetEditViewModel.SaveResult.OK ->
+                        findNavController().popBackStack()
+                    PresetEditViewModel.SaveResult.NAME_EMPTY ->
+                        Toast.makeText(requireContext(), "プリセット名を入力してください", Toast.LENGTH_SHORT).show()
+                    PresetEditViewModel.SaveResult.NO_ROUTINE ->
+                        Toast.makeText(requireContext(), "ルーティンを作成してください", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -95,6 +109,17 @@ class PresetEditFragment : Fragment() {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * キャンセル処理。
+     * rowRoutine タップで仮作成したプリセットがあれば削除してから戻る。
+     */
+    private fun performCancel() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.cancelAndCleanup()
+            findNavController().popBackStack()
         }
     }
 

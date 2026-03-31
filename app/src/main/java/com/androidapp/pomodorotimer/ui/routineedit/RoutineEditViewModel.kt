@@ -7,9 +7,9 @@ import com.androidapp.pomodorotimer.data.model.RoutineItem
 import com.androidapp.pomodorotimer.data.repository.PresetRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
 class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel() {
@@ -17,11 +17,6 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
     private val _items = MutableStateFlow<List<RoutineItem>>(emptyList())
     val items: StateFlow<List<RoutineItem>> = _items
 
-    /**
-     * RecyclerViewに渡す表示用リスト。
-     * depth > 0 のAddButton（ループ内追加ボタン）のみ含む。
-     * 末尾追加はFABが担うため depth=0 のAddButtonは生成しない。
-     */
     val displayList: StateFlow<List<RoutineListEntry>> = _items
         .map { buildDisplayList(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -42,13 +37,46 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
             .mapIndexed { i, it -> reorder(it, i) }
     }
 
+    /**
+     * ドラッグ&ドロップによる並び替え。[from]/[to] は _items リスト上のインデックス。
+     *
+     * LoopEnd     → 移動不可
+     * LoopStart   → 対応 LoopEnd までをブロックとして移動（ブロック内へのドロップは無効）
+     * Timer/Alarm → 単体で自由移動
+     */
     fun moveItem(from: Int, to: Int) {
         val list = _items.value.toMutableList()
-        if (from < 0 || to < 0 || from >= list.size || to >= list.size) return
-        val moved = list.removeAt(from)
-        list.add(to, moved)
+        if (from < 0 || to < 0 || from >= list.size || to >= list.size || from == to) return
+
+        when (list[from]) {
+            is RoutineItem.LoopEnd -> return
+
+            is RoutineItem.LoopStart -> {
+                val endIndex = findMatchingLoopEnd(list, from)
+                if (endIndex == -1) return
+                if (to in from..endIndex) return   // ブロック内へのドロップは無効
+
+                val block = list.subList(from, endIndex + 1).toList()
+                repeat(block.size) { list.removeAt(from) }
+                // from より後ろへ移動する場合、block を取り除いた分インデックスがずれる
+                val insertAt = if (to > endIndex) to - block.size + 1 else to
+                block.forEachIndexed { i, item -> list.add(insertAt + i, item) }
+            }
+
+            else -> {
+                // Timer / Alarm: 単体で自由移動
+                // removeAt(from) した後のリストに対して to を調整する必要がある
+                val moved = list.removeAt(from)
+                // from より後ろへ移動する場合は removeAt でインデックスが1つずれる
+                val insertAt = if (to > from) to - 1 else to
+                list.add(insertAt.coerceIn(0, list.size), moved)
+            }
+        }
+
         _items.value = list.mapIndexed { i, item -> reorder(item, i) }
     }
+
+    // ---- CRUD ----
 
     fun addLoop(count: Int, insertAfterIndex: Int?) {
         val list = _items.value.toMutableList()
@@ -63,7 +91,8 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
 
     fun addAlarm(volume: Int, duration: Int, soundUri: String, vibrate: Boolean, insertAfterIndex: Int?) =
         insertItem(
-            RoutineItem.Alarm(order = 0, volume = volume, durationSeconds = duration, soundUri = soundUri, vibrate = vibrate),
+            RoutineItem.Alarm(order = 0, volume = volume, durationSeconds = duration,
+                soundUri = soundUri, vibrate = vibrate),
             insertAfterIndex
         )
 
@@ -80,7 +109,8 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
     fun updateAlarm(id: Int, volume: Int, duration: Int, soundUri: String, vibrate: Boolean) =
         updateItem { item ->
             if (item is RoutineItem.Alarm && item.id == id)
-                item.copy(volume = volume, durationSeconds = duration, soundUri = soundUri, vibrate = vibrate)
+                item.copy(volume = volume, durationSeconds = duration,
+                    soundUri = soundUri, vibrate = vibrate)
             else item
         }
 
@@ -102,38 +132,38 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
         is RoutineItem.Alarm     -> item.copy(order = newOrder)
     }
 
-    /**
-     * displayList 構築。
-     * ループ内追加ボタン（depth > 0）のみ挿入し、末尾の depth=0 AddButtonは含めない。
-     */
+    private fun findMatchingLoopEnd(items: List<RoutineItem>, startIndex: Int): Int {
+        var depth = 0
+        for (i in startIndex until items.size) {
+            when (items[i]) {
+                is RoutineItem.LoopStart -> depth++
+                is RoutineItem.LoopEnd   -> { depth--; if (depth == 0) return i }
+                else -> {}
+            }
+        }
+        return -1
+    }
+
     private fun buildDisplayList(items: List<RoutineItem>): List<RoutineListEntry> {
         val result = mutableListOf<RoutineListEntry>()
-        val loopStartIndexStack = ArrayDeque<Int>()
+        val depthStack = ArrayDeque<Int>()
 
         for (i in items.indices) {
             val item = items[i]
-            val currentDepth = loopStartIndexStack.size
-
+            val currentDepth = depthStack.size
             when (item) {
                 is RoutineItem.LoopStart -> {
                     result.add(RoutineListEntry.Item(item, depth = currentDepth))
-                    loopStartIndexStack.addLast(i)
+                    depthStack.addLast(i)
                 }
                 is RoutineItem.LoopEnd -> {
-                    // LoopEnd直前にループ内追加ボタンを挿入（depth > 0 扱い）
-                    result.add(RoutineListEntry.AddButton(
-                        insertAfterIndex = i - 1,
-                        depth = currentDepth   // currentDepth >= 1
-                    ))
-                    loopStartIndexStack.removeLastOrNull()
-                    result.add(RoutineListEntry.Item(item, depth = loopStartIndexStack.size))
+                    result.add(RoutineListEntry.AddButton(insertAfterIndex = i - 1, depth = currentDepth))
+                    depthStack.removeLastOrNull()
+                    result.add(RoutineListEntry.Item(item, depth = depthStack.size))
                 }
-                else -> {
-                    result.add(RoutineListEntry.Item(item, depth = currentDepth))
-                }
+                else -> result.add(RoutineListEntry.Item(item, depth = currentDepth))
             }
         }
-        // 末尾AddButtonは追加しない（FABが担う）
         return result
     }
 

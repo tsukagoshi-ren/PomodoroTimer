@@ -2,6 +2,7 @@ package com.androidapp.pomodorotimer.ui.routineedit
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Canvas
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
@@ -39,6 +40,7 @@ class RoutineEditFragment : Fragment() {
     }
 
     private lateinit var adapter: RoutineItemAdapter
+    private lateinit var dragHelper: LoopBlockDragHelper
     private var presetId: Int = -1
 
     private var onSoundPicked: ((Uri) -> Unit)? = null
@@ -65,7 +67,9 @@ class RoutineEditFragment : Fragment() {
         "🎮 デジタル（ブッ）" to "tick_digital",
     )
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View {
         _binding = FragmentRoutineEditBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -74,8 +78,8 @@ class RoutineEditFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         presetId = arguments?.getInt("presetId") ?: return
+        dragHelper = LoopBlockDragHelper(binding.recyclerView)
 
-        // ActionBar 保存ボタン
         val menuHost: MenuHost = requireActivity()
         menuHost.addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
@@ -93,56 +97,200 @@ class RoutineEditFragment : Fragment() {
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
 
-        // Adapter
         adapter = RoutineItemAdapter(
-            onDelete = { item -> viewModel.removeItem(item) },
-            onEdit   = { item -> showEditDialog(item) },
-            // ループ内AddButtonからのコールバック（insertAfterIndex != null）
+            onDelete         = { item -> viewModel.removeItem(item) },
+            onEdit           = { item -> showEditDialog(item) },
             onAddButtonClick = { insertAfterIndex -> showAddItemDialog(insertAfterIndex) },
-            onMove   = { from, to -> viewModel.moveItem(from, to) }
+            onMove           = { from, to -> viewModel.moveItem(from, to) }
         )
 
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
 
-        // ItemTouchHelper
+        // ---- ItemTouchHelper ----
         val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
         ) {
-            private var dragFrom = -1
-            private var dragTo   = -1
+            private var dragFromDisplay = -1
+            private var dragToDisplay   = -1
+
+            override fun getMovementFlags(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder
+            ): Int {
+                val pos = viewHolder.adapterPosition
+                if (pos < 0 || pos >= adapter.itemCount) return makeMovementFlags(0, 0)
+                val entry = adapter.getEntry(pos)
+                val draggable = when {
+                    entry is RoutineListEntry.AddButton -> false
+                    entry is RoutineListEntry.Item &&
+                            entry.routineItem is RoutineItem.LoopEnd -> false
+                    else -> true
+                }
+                return if (draggable)
+                    makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0)
+                else
+                    makeMovementFlags(0, 0)
+            }
+
+            override fun onSelectedChanged(
+                viewHolder: RecyclerView.ViewHolder?,
+                actionState: Int
+            ) {
+                super.onSelectedChanged(viewHolder, actionState)
+
+                if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder != null) {
+                    val pos = viewHolder.adapterPosition
+                    if (pos < 0) return
+                    val entry = adapter.getEntry(pos)
+
+                    if (entry is RoutineListEntry.Item &&
+                        entry.routineItem is RoutineItem.LoopStart
+                    ) {
+                        // ブロック内の全 ViewHolder を収集
+                        val (blockVhs, blockEntries) = collectBlockViewHoldersAndEntries(pos)
+                        if (blockVhs.isNotEmpty()) {
+                            val touchY = viewHolder.itemView.top.toFloat() +
+                                    viewHolder.itemView.height / 2f
+                            dragHelper.startOverlay(viewHolder, blockVhs, blockEntries, touchY)
+                        }
+                    }
+                } else if (actionState == ItemTouchHelper.ACTION_STATE_IDLE) {
+                    dragHelper.stopOverlay()
+                    adapter.clearGreyOut()
+                }
+            }
+
+            override fun onChildDraw(
+                c: Canvas,
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                dX: Float,
+                dY: Float,
+                actionState: Int,
+                isCurrentlyActive: Boolean
+            ) {
+                if (dragHelper.isActive) {
+                    // オーバーレイをドラッグ中ViewHolderのtop位置に追従させる
+                    val draggedTop = viewHolder.itemView.top.toFloat() + dY
+                    dragHelper.updateOverlayPosition(draggedTop)
+                    // 本体ViewHolderは透明なので通常描画はスキップ
+                    return
+                }
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
+            }
 
             override fun onMove(
                 recyclerView: RecyclerView,
                 viewHolder: RecyclerView.ViewHolder,
                 target: RecyclerView.ViewHolder
             ): Boolean {
-                if (target is RoutineItemAdapter.AddButtonViewHolder) return false
-                val from = viewHolder.adapterPosition
-                val to   = target.adapterPosition
-                if (dragFrom == -1) dragFrom = from
-                dragTo = to
-                adapter.onItemMoved(from, to)
+                val fromPos = viewHolder.adapterPosition
+                val toPos   = target.adapterPosition
+                if (fromPos < 0 || toPos < 0 || fromPos == toPos) return false
+
+                val dragEntry   = adapter.getEntry(fromPos)
+                val targetEntry = adapter.getEntry(toPos)
+
+                if (targetEntry is RoutineListEntry.AddButton) return false
+
+                if (dragEntry is RoutineListEntry.Item &&
+                    dragEntry.routineItem is RoutineItem.LoopStart
+                ) {
+                    val blockStart = if (dragFromDisplay != -1) dragFromDisplay else fromPos
+                    val blockEnd   = findBlockEndDisplay(blockStart)
+                    if (blockEnd != -1 && toPos in blockStart..blockEnd) return false
+                }
+
+                if (dragFromDisplay == -1) dragFromDisplay = fromPos
+                dragToDisplay = toPos
+                adapter.onItemMoved(fromPos, toPos)
                 return true
             }
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
 
-            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+            override fun clearView(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder
+            ) {
                 super.clearView(recyclerView, viewHolder)
-                if (dragFrom != -1 && dragTo != -1 && dragFrom != dragTo) {
-                    adapter.onItemDropped(dragFrom, dragTo)
-                }
-                dragFrom = -1
-                dragTo   = -1
-            }
 
-            override fun getMovementFlags(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int {
-                if (viewHolder is RoutineItemAdapter.AddButtonViewHolder) return 0
-                return super.getMovementFlags(recyclerView, viewHolder)
+                val from = dragFromDisplay
+                val to   = dragToDisplay
+                dragFromDisplay = -1
+                dragToDisplay   = -1
+                dragHelper.stopOverlay()
+                adapter.clearGreyOut()
+
+                if (from != -1 && to != -1 && from != to) {
+                    val stableDisplayList = viewModel.displayList.value
+                    val fromItem = displayToItemIndex(stableDisplayList, from)
+                    val toItem   = displayToItemIndex(stableDisplayList, to)
+                    if (fromItem != -1 && toItem != -1) {
+                        viewModel.moveItem(fromItem, toItem)
+                    }
+                }
             }
 
             override fun isLongPressDragEnabled(): Boolean = false
+
+            // ---- ヘルパー ----
+
+            /**
+             * displayList 上で loopStartDisplayPos の LoopStart に対応する
+             * LoopEnd の display インデックスを返す。見つからなければ -1。
+             */
+            private fun findBlockEndDisplay(loopStartDisplayPos: Int): Int {
+                var depth = 0
+                for (i in loopStartDisplayPos until adapter.itemCount) {
+                    val e = adapter.getEntry(i)
+                    if (e is RoutineListEntry.Item) {
+                        when (e.routineItem) {
+                            is RoutineItem.LoopStart -> depth++
+                            is RoutineItem.LoopEnd -> {
+                                depth--
+                                if (depth == 0) return i
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+                return -1
+            }
+
+            /**
+             * displayList 上の [loopStartDisplayPos] から始まるブロック
+             * (LoopStart〜LoopEnd) の全 ViewHolder と対応 Entry を収集する。
+             */
+            private fun collectBlockViewHoldersAndEntries(
+                loopStartDisplayPos: Int
+            ): Pair<List<RecyclerView.ViewHolder>, List<RoutineListEntry>> {
+                val blockEnd = findBlockEndDisplay(loopStartDisplayPos)
+                if (blockEnd == -1) return Pair(emptyList(), emptyList())
+                val vhs     = mutableListOf<RecyclerView.ViewHolder>()
+                val entries = mutableListOf<RoutineListEntry>()
+                for (displayPos in loopStartDisplayPos..blockEnd) {
+                    val entry = adapter.getEntry(displayPos)
+                    if (entry is RoutineListEntry.AddButton) continue
+                    binding.recyclerView.findViewHolderForAdapterPosition(displayPos)
+                        ?.let { vhs.add(it); entries.add(entry) }
+                }
+                return Pair(vhs, entries)
+            }
+
+            private fun displayToItemIndex(
+                displayList: List<RoutineListEntry>,
+                displayPos: Int
+            ): Int {
+                if (displayPos < 0 || displayPos >= displayList.size) return -1
+                if (displayList[displayPos] is RoutineListEntry.AddButton) return -1
+                var count = 0
+                for (i in 0 until displayPos) {
+                    if (displayList[i] is RoutineListEntry.Item) count++
+                }
+                return count
+            }
         })
         touchHelper.attachToRecyclerView(binding.recyclerView)
         adapter.itemTouchHelper = touchHelper
@@ -153,7 +301,6 @@ class RoutineEditFragment : Fragment() {
             viewModel.displayList.collect { adapter.submitList(it) }
         }
 
-        // FAB：末尾追加（insertAfterIndex = null）
         binding.fabAddItem.setOnClickListener {
             showAddItemDialog(insertAfterIndex = null)
         }
@@ -175,7 +322,11 @@ class RoutineEditFragment : Fragment() {
             .show()
     }
 
-    private fun showLoopDialog(existingId: Int = 0, existingCount: Int = 3, insertAfterIndex: Int? = null) {
+    private fun showLoopDialog(
+        existingId: Int = 0,
+        existingCount: Int = 3,
+        insertAfterIndex: Int? = null
+    ) {
         val input = android.widget.EditText(requireContext()).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setText(existingCount.toString())
@@ -201,11 +352,9 @@ class RoutineEditFragment : Fragment() {
         insertAfterIndex: Int? = null
     ) {
         var selectedTickSound: String? = existingTickSound
-
         val initH = existingSeconds / 3600
         val initM = (existingSeconds % 3600) / 60
         val initS = existingSeconds % 60
-
         val ctx = requireContext()
         val dp = ctx.resources.displayMetrics.density
 
@@ -222,13 +371,14 @@ class RoutineEditFragment : Fragment() {
                 layoutParams = android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-            val picker = NumberPicker(ctx).apply {
+            NumberPicker(ctx).apply {
                 minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true
+                col.addView(this)
             }
-            val lbl = android.widget.TextView(ctx).apply {
+            android.widget.TextView(ctx).apply {
                 text = labelText; gravity = android.view.Gravity.CENTER; textSize = 12f
+                col.addView(this)
             }
-            col.addView(picker); col.addView(lbl)
             return col
         }
 
@@ -245,34 +395,35 @@ class RoutineEditFragment : Fragment() {
             gravity = android.view.Gravity.CENTER_VERTICAL
             setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
         }
-        val tickLabelView = android.widget.TextView(ctx).apply {
+        android.widget.TextView(ctx).apply {
             text = "ティック音"; textSize = 14f
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            tickRow.addView(this)
         }
-        val buttonTick = android.widget.Button(ctx).apply {
+        val tickButton = android.widget.Button(ctx).apply {
             text = tickDisplayName(selectedTickSound)
-            setOnClickListener {
-                val names = tickSoundOptions.map { it.first }.toTypedArray()
-                val currentIdx = tickSoundOptions.indexOfFirst { it.second == selectedTickSound }.coerceAtLeast(0)
-                androidx.appcompat.app.AlertDialog.Builder(ctx)
-                    .setTitle("ティック音を選択")
-                    .setSingleChoiceItems(names, currentIdx) { dialog, which ->
-                        selectedTickSound = tickSoundOptions[which].second
-                        text = tickSoundOptions[which].first
-                        dialog.dismiss()
-                    }
-                    .setNegativeButton("キャンセル", null)
-                    .show()
-            }
+            tickRow.addView(this)
         }
-        tickRow.addView(tickLabelView); tickRow.addView(buttonTick)
+        tickButton.setOnClickListener {
+            val names = tickSoundOptions.map { it.first }.toTypedArray()
+            val curIdx = tickSoundOptions.indexOfFirst { it.second == selectedTickSound }
+                .coerceAtLeast(0)
+            androidx.appcompat.app.AlertDialog.Builder(ctx)
+                .setTitle("ティック音を選択")
+                .setSingleChoiceItems(names, curIdx) { dialog, which ->
+                    selectedTickSound = tickSoundOptions[which].second
+                    tickButton.text = tickSoundOptions[which].first
+                    dialog.dismiss()
+                }
+                .setNegativeButton("キャンセル", null)
+                .show()
+        }
 
         val layout = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             addView(pickerRow); addView(tickRow)
         }
-
         val pickerH = colH.getChildAt(0) as NumberPicker
         val pickerM = colM.getChildAt(0) as NumberPicker
         val pickerS = colS.getChildAt(0) as NumberPicker
@@ -301,7 +452,6 @@ class RoutineEditFragment : Fragment() {
         var currentSoundUri = existingSoundUri
         val ctx = requireContext()
         val dp = ctx.resources.displayMetrics.density
-
         val initM = existingDuration / 60
         val initS = existingDuration % 60
 
@@ -318,7 +468,8 @@ class RoutineEditFragment : Fragment() {
 
         val editVolume = android.widget.EditText(ctx).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText(existingVolume.toString()); hint = "音量（0-100）"
+            setText(existingVolume.toString())
+            hint = "音量（0-100）"
         }
 
         val pickerRow = android.widget.LinearLayout(ctx).apply {
@@ -326,27 +477,27 @@ class RoutineEditFragment : Fragment() {
             gravity = android.view.Gravity.CENTER
         }
 
-        fun makePicker(max: Int, init: Int, labelText: String): android.widget.LinearLayout {
+        fun makePicker(max: Int, init: Int, lbl: String): android.widget.LinearLayout {
             val col = android.widget.LinearLayout(ctx).apply {
                 orientation = android.widget.LinearLayout.VERTICAL
                 gravity = android.view.Gravity.CENTER
                 layoutParams = android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-            val picker = NumberPicker(ctx).apply {
+            NumberPicker(ctx).apply {
                 minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true
+                col.addView(this)
             }
-            val lbl = android.widget.TextView(ctx).apply {
-                text = labelText; gravity = android.view.Gravity.CENTER; textSize = 12f
+            android.widget.TextView(ctx).apply {
+                text = lbl; gravity = android.view.Gravity.CENTER; textSize = 12f
+                col.addView(this)
             }
-            col.addView(picker); col.addView(lbl)
             return col
         }
 
         val colM = makePicker(59, initM, "分")
         val colS = makePicker(59, initS, "秒")
         pickerRow.addView(colM); pickerRow.addView(colS)
-
         val pickerM = colM.getChildAt(0) as NumberPicker
         val pickerS = colS.getChildAt(0) as NumberPicker
 
@@ -356,19 +507,19 @@ class RoutineEditFragment : Fragment() {
         }
         val buttonSound = android.widget.Button(ctx).apply {
             text = "🎵 ${getRingtoneName(existingSoundUri)}"
-            setOnClickListener {
-                onSoundPicked = { uri ->
-                    currentSoundUri = uri.toString()
-                    text = "🎵 ${getRingtoneName(uri.toString())}"
-                }
-                soundPickerLauncher.launch(Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALL)
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "アラーム音を選択")
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(currentSoundUri))
-                })
+        }
+        buttonSound.setOnClickListener {
+            onSoundPicked = { uri ->
+                currentSoundUri = uri.toString()
+                buttonSound.text = "🎵 ${getRingtoneName(uri.toString())}"
             }
+            soundPickerLauncher.launch(Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALL)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "アラーム音を選択")
+                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(currentSoundUri))
+            })
         }
 
         layout.addView(label("音量（0〜100）")); layout.addView(editVolume)
@@ -380,7 +531,8 @@ class RoutineEditFragment : Fragment() {
             .setTitle("アラーム設定")
             .setView(layout)
             .setPositiveButton("OK") { _, _ ->
-                val vol = editVolume.text.toString().toIntOrNull()?.coerceIn(0, 100) ?: return@setPositiveButton
+                val vol = editVolume.text.toString().toIntOrNull()?.coerceIn(0, 100)
+                    ?: return@setPositiveButton
                 val dur = pickerM.value * 60 + pickerS.value
                 if (dur <= 0) return@setPositiveButton
                 val vib = checkVibrate.isChecked
@@ -395,19 +547,19 @@ class RoutineEditFragment : Fragment() {
         when (item) {
             is RoutineItem.LoopStart -> showLoopDialog(item.id, item.count)
             is RoutineItem.Timer     -> showTimerDialog(item.id, item.durationSeconds, item.tickSound)
-            is RoutineItem.Alarm     -> showAlarmDialog(item.id, item.volume, item.durationSeconds, item.vibrate, item.soundUri)
+            is RoutineItem.Alarm     -> showAlarmDialog(
+                item.id, item.volume, item.durationSeconds, item.vibrate, item.soundUri)
             else -> {}
         }
     }
 
-    private fun getRingtoneName(uriString: String): String {
-        return try {
-            RingtoneManager.getRingtone(requireContext(), Uri.parse(uriString))
-                ?.getTitle(requireContext()) ?: "デフォルト"
-        } catch (e: Exception) { "デフォルト" }
-    }
+    private fun getRingtoneName(uriString: String): String = try {
+        RingtoneManager.getRingtone(requireContext(), Uri.parse(uriString))
+            ?.getTitle(requireContext()) ?: "デフォルト"
+    } catch (_: Exception) { "デフォルト" }
 
     override fun onDestroyView() {
+        dragHelper.stopOverlay()
         super.onDestroyView()
         _binding = null
     }

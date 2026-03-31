@@ -26,6 +26,12 @@ class PresetEditViewModel(
     private val _uiState = MutableStateFlow(PresetEditUiState())
     val uiState: StateFlow<PresetEditUiState> = _uiState
 
+    /**
+     * rowRoutine タップ時に採番したIDを記録する。
+     * キャンセル時にこのIDが新規作成分であれば削除する。
+     */
+    private var provisionallyCreatedId: Int? = null
+
     fun loadPreset(id: Int) {
         viewModelScope.launch {
             val preset = repository.getPresetById(id) ?: return@launch
@@ -46,7 +52,12 @@ class PresetEditViewModel(
         _uiState.value = _uiState.value.copy(triggerType = type, triggerDatetime = datetime)
     }
 
-    // 保存してIDを返す（新規の場合はinsertして採番されたIDを返す）
+    /**
+     * ルーティン編集画面に遷移する前に呼ぶ。
+     * 新規の場合はDBにinsertしてIDを確保し、provisionallyCreatedId に記録する。
+     * 既存の場合は通常通りupdateしてIDを返す。
+     * 名前が空の場合は null を返す。
+     */
     suspend fun saveAndGetId(): Int? {
         val name = _uiState.value.name
         if (name.isBlank()) return null
@@ -60,6 +71,7 @@ class PresetEditViewModel(
         return if (state.id == -1) {
             val newId = repository.savePreset(preset)
             _uiState.value = state.copy(id = newId)
+            provisionallyCreatedId = newId   // 仮作成IDを記録
             scheduleOrCancel(newId, state)
             newId
         } else {
@@ -69,25 +81,54 @@ class PresetEditViewModel(
         }
     }
 
-    // Fragmentから名前をセットした後に呼ぶ
-    suspend fun save(): Boolean {
+    /**
+     * 保存ボタン押下時に呼ぶ。
+     * - 名前が空 → false
+     * - ルーティンアイテムが0件 → false（エラーコードで区別）
+     * - それ以外 → 保存して true
+     */
+    enum class SaveResult { OK, NAME_EMPTY, NO_ROUTINE }
+
+    suspend fun save(): SaveResult {
         val state = _uiState.value
-        if (state.name.isBlank()) return false
+        if (state.name.isBlank()) return SaveResult.NAME_EMPTY
+
+        // ルーティンアイテムの件数チェック
+        val currentId = if (state.id == -1) {
+            // まだDBに存在しない（rowRoutineを1度もタップしていない）→ アイテムは必ず0件
+            return SaveResult.NO_ROUTINE
+        } else {
+            state.id
+        }
+        val items = repository.getRoutineItemsOnce(currentId)
+        if (items.isEmpty()) return SaveResult.NO_ROUTINE
+
+        // 保存
         val preset = Preset(
-            id = if (state.id == -1) 0 else state.id,
+            id = currentId,
             name = state.name,
             triggerType = state.triggerType,
             triggerDatetime = state.triggerDatetime
         )
-        val savedId = if (state.id == -1) {
-            repository.savePreset(preset)
-        } else {
-            repository.updatePreset(preset)
-            state.id
-        }
-        // AlarmManager への登録・解除
-        scheduleOrCancel(savedId, state)
-        return true
+        repository.updatePreset(preset)
+        scheduleOrCancel(currentId, state)
+
+        // 正常保存できたので仮作成フラグを解除
+        provisionallyCreatedId = null
+        return SaveResult.OK
+    }
+
+    /**
+     * キャンセル時に呼ぶ。
+     * rowRoutine タップで仮作成したプリセットがある場合は削除する。
+     * 既存プリセットの編集キャンセルの場合は何もしない。
+     */
+    suspend fun cancelAndCleanup() {
+        val id = provisionallyCreatedId ?: return
+        val preset = repository.getPresetById(id) ?: return
+        repository.deletePreset(preset)
+        AlarmScheduler.cancel(appContext, id)
+        provisionallyCreatedId = null
     }
 
     private fun scheduleOrCancel(presetId: Int, state: PresetEditUiState) {
@@ -100,8 +141,6 @@ class PresetEditViewModel(
             AlarmScheduler.cancel(appContext, presetId)
         }
     }
-
-    private fun binding_editName_workaround() = _uiState.value.name
 
     class Factory(
         private val repository: PresetRepository,
