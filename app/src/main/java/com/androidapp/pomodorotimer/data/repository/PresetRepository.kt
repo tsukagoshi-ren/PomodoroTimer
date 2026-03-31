@@ -7,6 +7,7 @@ import com.androidapp.pomodorotimer.data.db.routine.RoutineItemEntity
 import com.androidapp.pomodorotimer.data.model.Preset
 import com.androidapp.pomodorotimer.data.model.RoutineItem
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class PresetRepository(
@@ -22,7 +23,9 @@ class PresetRepository(
         presetDao.getPresetById(id)?.toPreset()
 
     suspend fun savePreset(preset: Preset): Int {
-        val id = presetDao.insertPreset(PresetEntity.fromPreset(preset))
+        val maxOrder = presetDao.getMaxOrder() ?: -1
+        val entity = PresetEntity.fromPreset(preset).copy(order = maxOrder + 1)
+        val id = presetDao.insertPreset(entity)
         return id.toInt()
     }
 
@@ -31,6 +34,65 @@ class PresetRepository(
 
     suspend fun deletePreset(preset: Preset) =
         presetDao.deletePreset(PresetEntity.fromPreset(preset))
+
+    suspend fun deletePresets(presets: List<Preset>) =
+        presetDao.deleteAll(presets.map { PresetEntity.fromPreset(it) })
+
+    /**
+     * 複数プリセットを、それぞれ元の直下にコピーする。
+     *
+     * 手順:
+     * 1. 現在の全プリセットを order 順で取得
+     * 2. order が後ろのものから処理することで、前に挿入してもインデックスがずれない
+     * 3. 全挿入後に order を連番で振り直す
+     */
+    suspend fun copyPresets(presets: List<Preset>) {
+        val current = getAllPresets().first().toMutableList()
+
+        // 表示順が後ろのものから処理（前への挿入でインデックスずれを防ぐ）
+        val sortedByIndexDesc = presets.sortedByDescending { p ->
+            current.indexOfFirst { it.id == p.id }
+        }
+
+        for (original in sortedByIndexDesc) {
+            val insertIndex = current.indexOfFirst { it.id == original.id }
+                .let { if (it == -1) current.size else it + 1 }
+
+            // DB に複製を挿入（order は後で一括更新するので仮値 0）
+            val newId = presetDao.insertPreset(
+                PresetEntity(
+                    id = 0,
+                    name = "${original.name} のコピー",
+                    triggerType = original.triggerType.name,
+                    triggerDatetime = original.triggerDatetime,
+                    order = 0
+                )
+            ).toInt()
+
+            // ルーティンアイテムもコピー
+            val items = routineItemDao.getItemsByPresetIdOnce(original.id)
+            if (items.isNotEmpty()) {
+                routineItemDao.insertAll(items.map { it.copy(id = 0, presetId = newId) })
+            }
+
+            // ローカルリストにも挿入して後続の insertIndex 計算に反映
+            current.add(insertIndex, original.copy(id = newId, name = "${original.name} のコピー"))
+        }
+
+        // 全プリセットの order を連番で振り直す
+        reorderPresets(current.map { it.id })
+    }
+
+    /**
+     * プリセットの表示順を一括更新。
+     * [orderedIds] は新しい表示順の id リスト（先頭が order=0）。
+     */
+    suspend fun reorderPresets(orderedIds: List<Int>) {
+        val entities = orderedIds.mapIndexedNotNull { index, id ->
+            presetDao.getPresetById(id)?.copy(order = index)
+        }
+        presetDao.updateAll(entities)
+    }
 
     // --- RoutineItem ---
 
@@ -42,7 +104,6 @@ class PresetRepository(
         routineItemDao.getItemsByPresetIdOnce(presetId)
             .map { it.toRoutineItem() }
 
-    // ルーティン全体を保存（差し替え方式）
     suspend fun saveRoutineItems(presetId: Int, items: List<RoutineItem>) {
         routineItemDao.deleteAllByPresetId(presetId)
         val entities = items.mapIndexed { index, item ->

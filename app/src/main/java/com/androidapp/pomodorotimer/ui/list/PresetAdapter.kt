@@ -1,8 +1,10 @@
 package com.androidapp.pomodorotimer.ui.list
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.androidapp.pomodorotimer.R
@@ -15,8 +17,14 @@ import java.util.Locale
 
 class PresetAdapter(
     private val onTap: (Preset) -> Unit,
-    private val onLongPress: (Preset) -> Unit
+    private val onLongPress: (Preset) -> Unit,
+    private val onEditClick: (Preset) -> Unit,
+    private val onCheckToggle: (Preset) -> Unit
 ) : ListAdapter<Preset, PresetAdapter.ViewHolder>(DiffCallback) {
+
+    var itemTouchHelper: ItemTouchHelper? = null
+    var isSelectionMode: Boolean = false
+    var selectedIds: Set<Int> = emptySet()
 
     inner class ViewHolder(private val binding: ItemPresetBinding) :
         RecyclerView.ViewHolder(binding.root) {
@@ -34,8 +42,32 @@ class PresetAdapter(
                     }
                 }
             }
-            binding.root.setOnClickListener { onTap(preset) }
-            binding.root.setOnLongClickListener { onLongPress(preset); true }
+
+            if (isSelectionMode) {
+                // 選択モード: チェックボックス + ドラッグハンドル + 編集ボタン
+                binding.checkbox.visibility = View.VISIBLE
+                binding.checkbox.isChecked = preset.id in selectedIds
+                binding.dragHandle.visibility = View.VISIBLE
+                binding.buttonEdit.visibility = View.VISIBLE
+
+                binding.root.setOnClickListener { onCheckToggle(preset) }
+                binding.root.setOnLongClickListener(null)
+                binding.checkbox.setOnClickListener { onCheckToggle(preset) }
+                binding.buttonEdit.setOnClickListener { onEditClick(preset) }
+                binding.dragHandle.setOnLongClickListener {
+                    itemTouchHelper?.startDrag(this)
+                    true
+                }
+            } else {
+                // 通常モード
+                binding.checkbox.visibility = View.GONE
+                binding.dragHandle.visibility = View.GONE
+                binding.buttonEdit.visibility = View.GONE
+
+                binding.root.setOnClickListener { onTap(preset) }
+                binding.root.setOnLongClickListener { onLongPress(preset); true }
+                binding.dragHandle.setOnLongClickListener(null)
+            }
         }
     }
 
@@ -44,6 +76,13 @@ class PresetAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) =
         holder.bind(getItem(position))
+
+    fun onItemMoved(from: Int, to: Int) {
+        val list = currentList.toMutableList()
+        val moved = list.removeAt(from)
+        list.add(to, moved)
+        submitList(list)
+    }
 
     companion object DiffCallback : DiffUtil.ItemCallback<Preset>() {
         override fun areItemsTheSame(a: Preset, b: Preset) = a.id == b.id

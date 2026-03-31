@@ -18,11 +18,24 @@
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
         android:paddingTop="14dp"
-        android:paddingBottom="14dp">
+        android:paddingBottom="14dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
 
+        <!-- チェックボックス（選択モードのみ表示） -->
+        <CheckBox
+            android:id="@+id/checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:clickable="false"
+            android:focusable="false"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <!-- プリセット名 -->
         <TextView
             android:id="@+id/textPresetName"
             android:layout_width="0dp"
@@ -30,10 +43,12 @@
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="@color/card_text_primary"
+            android:layout_marginStart="8dp"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            app:layout_constraintStart_toEndOf="@id/checkbox"
+            app:layout_constraintEnd_toStartOf="@id/buttonEdit" />
 
+        <!-- トリガー情報 -->
         <TextView
             android:id="@+id/textTrigger"
             android:layout_width="0dp"
@@ -41,9 +56,39 @@
             android:textSize="12sp"
             android:textColor="@color/card_text_secondary"
             android:layout_marginTop="4dp"
+            android:layout_marginStart="8dp"
             app:layout_constraintTop_toBottomOf="@id/textPresetName"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@id/checkbox"
+            app:layout_constraintEnd_toStartOf="@id/buttonEdit" />
+
+        <!-- 編集ボタン（選択モードのみ表示） -->
+        <ImageButton
+            android:id="@+id/buttonEdit"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_edit"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_edit"
+            android:padding="6dp"
+            android:alpha="0.6"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/dragHandle" />
+
+        <!-- ドラッグハンドル（選択モードのみ表示） -->
+        <ImageView
+            android:id="@+id/dragHandle"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_drag_handle"
+            android:contentDescription="@string/desc_drag_handle"
+            android:padding="6dp"
+            android:alpha="0.4"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
