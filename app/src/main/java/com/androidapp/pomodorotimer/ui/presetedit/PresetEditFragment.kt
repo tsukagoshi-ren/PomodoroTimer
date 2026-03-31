@@ -45,12 +45,9 @@ class PresetEditFragment : Fragment() {
         val presetId = arguments?.getInt("presetId", -1) ?: -1
         if (presetId != -1) viewModel.loadPreset(presetId)
 
-        // トリガー行タップでダイアログ
         binding.rowTrigger.setOnClickListener { showTriggerDialog() }
 
-        // ルーティン行タップで遷移（新規の場合は先に保存してからIDを渡す）
         binding.rowRoutine.setOnClickListener {
-            // クリック時点でEditTextの内容をViewModelに反映してから保存
             viewModel.setName(binding.editName.text.toString().trim())
             viewLifecycleOwner.lifecycleScope.launch {
                 val savedId = viewModel.saveAndGetId()
@@ -65,29 +62,12 @@ class PresetEditFragment : Fragment() {
             }
         }
 
-        // UI状態の反映
-        var nameInitialized = false
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.uiState.collect { state ->
-                // プリセット名は初回（既存プリセットの読み込み時）のみセット
-                if (!nameInitialized && state.name.isNotEmpty()) {
-                    binding.editName.setText(state.name)
-                    nameInitialized = true
-                }
-
-                binding.textTriggerValue.text = when (state.triggerType) {
-                    TriggerType.BUTTON -> "ボタンで開始"
-                    TriggerType.DATETIME -> {
-                        val dt = state.triggerDatetime
-                        if (dt != null) {
-                            SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.JAPAN).format(dt)
-                        } else "日時を選択"
-                    }
-                }
-            }
+        // キャンセルボタン：保存せずに戻る
+        binding.buttonCancel.setOnClickListener {
+            findNavController().popBackStack()
         }
 
+        // 保存ボタン
         binding.buttonSave.setOnClickListener {
             val name = binding.editName.text.toString().trim()
             viewModel.setName(name)
@@ -95,6 +75,25 @@ class PresetEditFragment : Fragment() {
                 val ok = viewModel.save()
                 if (ok) findNavController().popBackStack()
                 else Toast.makeText(requireContext(), "プリセット名を入力してください", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // UI状態の反映
+        var nameInitialized = false
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.uiState.collect { state ->
+                if (!nameInitialized && state.name.isNotEmpty()) {
+                    binding.editName.setText(state.name)
+                    nameInitialized = true
+                }
+                binding.textTriggerValue.text = when (state.triggerType) {
+                    TriggerType.BUTTON -> "ボタンで開始"
+                    TriggerType.DATETIME -> {
+                        val dt = state.triggerDatetime
+                        if (dt != null) SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.JAPAN).format(dt)
+                        else "日時を選択"
+                    }
+                }
             }
         }
     }

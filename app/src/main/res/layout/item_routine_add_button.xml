@@ -17,14 +17,14 @@
     <!-- ループ内であることを示す縦線 -->
     <View
         android:layout_width="2dp"
-        android:layout_height="36dp"
+        android:layout_height="38dp"
         android:background="@color/card_background"
         android:layout_marginEnd="12dp" />
 
     <Button
         android:id="@+id/buttonAddItem"
         android:layout_width="wrap_content"
-        android:layout_height="32dp"
+        android:layout_height="38dp"
         android:text="＋ ループ内に追加"
         android:textSize="12sp"
         android:paddingStart="14dp"

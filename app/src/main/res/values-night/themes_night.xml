@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-
     <style name="Base.Theme.PomodoroTimer" parent="Theme.Material3.Dark.NoActionBar">
-        <!-- カラースキーム -->
         <item name="colorPrimary">@color/accent_blue</item>
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorPrimaryContainer">@color/accent_blue_container</item>
@@ -10,53 +8,18 @@
         <item name="colorSecondary">@color/accent_blue</item>
         <item name="colorOnSecondary">@color/white</item>
         <item name="colorTertiary">@color/accent_blue</item>
-
-        <!-- 背景 -->
         <item name="android:colorBackground">@color/bg_surface</item>
         <item name="colorSurface">@color/bg_surface</item>
         <item name="colorSurfaceVariant">@color/card_background</item>
         <item name="colorOnSurface">@color/card_text_primary</item>
         <item name="colorOnSurfaceVariant">@color/card_text_secondary</item>
-
-        <!-- アウトライン -->
         <item name="colorOutline">@color/outline</item>
         <item name="colorOutlineVariant">@color/outline</item>
-
-        <!-- Toolbar背景 -->
         <item name="colorSurfaceContainer">@color/bg_primary</item>
         <item name="colorSurfaceContainerHigh">@color/bg_primary</item>
-
-        <!-- FAB -->
         <item name="floatingActionButtonStyle">@style/Widget.App.FloatingActionButton</item>
         <item name="extendedFloatingActionButtonStyle">@style/Widget.App.ExtendedFloatingActionButton</item>
-
-        <!-- Button -->
         <item name="materialButtonStyle">@style/Widget.App.Button</item>
         <item name="borderlessButtonStyle">@style/Widget.App.Button.Borderless</item>
     </style>
-
-    <style name="Theme.PomodoroTimer" parent="Base.Theme.PomodoroTimer" />
-
-    <!-- FAB（ブルー） -->
-    <style name="Widget.App.FloatingActionButton" parent="Widget.Material3.FloatingActionButton.Primary">
-        <item name="backgroundTint">@color/accent_blue</item>
-        <item name="tint">@color/white</item>
-    </style>
-
-    <style name="Widget.App.ExtendedFloatingActionButton" parent="Widget.Material3.ExtendedFloatingActionButton.Primary">
-        <item name="backgroundTint">@color/accent_blue</item>
-        <item name="android:textColor">@color/white</item>
-        <item name="iconTint">@color/white</item>
-    </style>
-
-    <!-- Button（ブルー） -->
-    <style name="Widget.App.Button" parent="Widget.Material3.Button">
-        <item name="backgroundTint">@color/accent_blue</item>
-        <item name="android:textColor">@color/white</item>
-    </style>
-
-    <style name="Widget.App.Button.Borderless" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">@color/accent_blue</item>
-    </style>
-
 </resources>

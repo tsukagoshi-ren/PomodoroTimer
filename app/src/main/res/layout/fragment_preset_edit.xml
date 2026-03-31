@@ -3,7 +3,8 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/bg_surface">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,7 +18,8 @@
             android:layout_height="wrap_content"
             android:text="プリセット名"
             android:textSize="12sp"
-            android:textColor="?attr/colorPrimary" />
+            android:textColor="@color/card_text_secondary"
+            android:layout_marginBottom="4dp" />
 
         <EditText
             android:id="@+id/editName"
@@ -25,81 +27,128 @@
             android:layout_height="wrap_content"
             android:inputType="text"
             android:hint="例：朝のルーティン"
+            android:textColor="@color/card_text_primary"
+            android:textColorHint="@color/card_text_secondary"
+            android:backgroundTint="@color/outline"
             android:layout_marginBottom="24dp" />
 
-        <!-- トリガー -->
+        <!-- 設定ラベル -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="設定"
             android:textSize="12sp"
-            android:textColor="?attr/colorPrimary"
+            android:textColor="@color/card_text_secondary"
             android:layout_marginBottom="4dp" />
 
-        <androidx.constraintlayout.widget.ConstraintLayout
+        <!-- トリガー行 -->
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/rowTrigger"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="?attr/selectableItemBackground"
-            android:layout_marginBottom="1dp">
+            android:layout_marginBottom="1dp"
+            android:foreground="?attr/selectableItemBackground"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="@color/card_background"
+            app:strokeWidth="0dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="トリガー"
-                android:textSize="16sp"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent" />
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
 
-            <TextView
-                android:id="@+id/textTriggerValue"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="14sp"
-                android:textColor="?attr/colorControlNormal"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="トリガー"
+                    android:textSize="15sp"
+                    android:textColor="@color/card_text_primary"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+                <TextView
+                    android:id="@+id/textTriggerValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textColor="@color/card_text_secondary"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- ルーティン -->
-        <androidx.constraintlayout.widget.ConstraintLayout
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ルーティン行 -->
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/rowRoutine"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="?attr/selectableItemBackground"
-            android:layout_marginTop="16dp">
+            android:layout_marginTop="8dp"
+            android:foreground="?attr/selectableItemBackground"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="@color/card_background"
+            app:strokeWidth="0dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="ルーティン"
-                android:textSize="16sp"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent" />
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="編集 ›"
-                android:textSize="14sp"
-                android:textColor="?attr/colorControlNormal"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ルーティン"
+                    android:textSize="15sp"
+                    android:textColor="@color/card_text_primary"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="編集 ›"
+                    android:textSize="13sp"
+                    android:textColor="@color/card_text_secondary"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- 保存ボタン -->
-        <Button
-            android:id="@+id/buttonSave"
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- キャンセル・保存ボタン -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="保存"
-            android:layout_marginTop="32dp" />
+            android:orientation="horizontal"
+            android:layout_marginTop="32dp"
+            android:weightSum="2">
+
+            <Button
+                android:id="@+id/buttonCancel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="キャンセル"
+                android:layout_marginEnd="8dp"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/buttonSave"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="保存"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
