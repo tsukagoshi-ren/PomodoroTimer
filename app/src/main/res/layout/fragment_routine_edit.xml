@@ -5,18 +5,29 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!--
-        保存ボタンはヘッダー（ActionBar menu）に配置するため
-        ここにはRecyclerViewのみ置く。
-        追加ボタン・保存ボタンはRecyclerView内のエントリとして表示する。
-    -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
-        android:paddingBottom="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="88dp"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!--
+        中央下固定の追加ボタン。
+        末尾AddButton（depth=0）の代替として Fragment から操作する。
+    -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fabAddItem"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="20dp"
+        android:text="アイテムを追加"
+        app:icon="@android:drawable/ic_input_add"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

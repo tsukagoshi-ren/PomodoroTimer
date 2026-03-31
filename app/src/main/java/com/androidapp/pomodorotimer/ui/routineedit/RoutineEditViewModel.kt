@@ -17,6 +17,11 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
     private val _items = MutableStateFlow<List<RoutineItem>>(emptyList())
     val items: StateFlow<List<RoutineItem>> = _items
 
+    /**
+     * RecyclerViewに渡す表示用リスト。
+     * depth > 0 のAddButton（ループ内追加ボタン）のみ含む。
+     * 末尾追加はFABが担うため depth=0 のAddButtonは生成しない。
+     */
     val displayList: StateFlow<List<RoutineListEntry>> = _items
         .map { buildDisplayList(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -97,6 +102,10 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
         is RoutineItem.Alarm     -> item.copy(order = newOrder)
     }
 
+    /**
+     * displayList 構築。
+     * ループ内追加ボタン（depth > 0）のみ挿入し、末尾の depth=0 AddButtonは含めない。
+     */
     private fun buildDisplayList(items: List<RoutineItem>): List<RoutineListEntry> {
         val result = mutableListOf<RoutineListEntry>()
         val loopStartIndexStack = ArrayDeque<Int>()
@@ -111,8 +120,11 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
                     loopStartIndexStack.addLast(i)
                 }
                 is RoutineItem.LoopEnd -> {
-                    val innerDepth = currentDepth
-                    result.add(RoutineListEntry.AddButton(insertAfterIndex = i - 1, depth = innerDepth))
+                    // LoopEnd直前にループ内追加ボタンを挿入（depth > 0 扱い）
+                    result.add(RoutineListEntry.AddButton(
+                        insertAfterIndex = i - 1,
+                        depth = currentDepth   // currentDepth >= 1
+                    ))
                     loopStartIndexStack.removeLastOrNull()
                     result.add(RoutineListEntry.Item(item, depth = loopStartIndexStack.size))
                 }
@@ -121,8 +133,7 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
                 }
             }
         }
-
-        result.add(RoutineListEntry.AddButton(insertAfterIndex = null, depth = 0))
+        // 末尾AddButtonは追加しない（FABが担う）
         return result
     }
 

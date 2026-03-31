@@ -56,12 +56,12 @@ class RoutineEditFragment : Fragment() {
         }
 
     private val tickSoundOptions: List<Pair<String, String?>> = listOf(
-        "なし"               to null,
-        "🕐 時計（カチッ）"  to "tick_clock",
-        "🪵 木製（コン）"    to "tick_wood",
-        "🔔 ベル（リン）"    to "tick_bell",
-        "📳 ソフト（ポッ）"  to "tick_soft",
-        "📳 ビープ（ピッ）"  to "tick_beep",
+        "なし"                to null,
+        "🕐 時計（カチッ）"   to "tick_clock",
+        "🪵 木製（コン）"     to "tick_wood",
+        "🔔 ベル（リン）"     to "tick_bell",
+        "📳 ソフト（ポッ）"   to "tick_soft",
+        "📳 ビープ（ピッ）"   to "tick_beep",
         "🎮 デジタル（ブッ）" to "tick_digital",
     )
 
@@ -75,6 +75,7 @@ class RoutineEditFragment : Fragment() {
 
         presetId = arguments?.getInt("presetId") ?: return
 
+        // ActionBar 保存ボタン
         val menuHost: MenuHost = requireActivity()
         menuHost.addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
@@ -92,9 +93,11 @@ class RoutineEditFragment : Fragment() {
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
 
+        // Adapter
         adapter = RoutineItemAdapter(
             onDelete = { item -> viewModel.removeItem(item) },
             onEdit   = { item -> showEditDialog(item) },
+            // ループ内AddButtonからのコールバック（insertAfterIndex != null）
             onAddButtonClick = { insertAfterIndex -> showAddItemDialog(insertAfterIndex) },
             onMove   = { from, to -> viewModel.moveItem(from, to) }
         )
@@ -102,6 +105,7 @@ class RoutineEditFragment : Fragment() {
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
 
+        // ItemTouchHelper
         val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
         ) {
@@ -148,6 +152,11 @@ class RoutineEditFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.displayList.collect { adapter.submitList(it) }
         }
+
+        // FAB：末尾追加（insertAfterIndex = null）
+        binding.fabAddItem.setOnClickListener {
+            showAddItemDialog(insertAfterIndex = null)
+        }
     }
 
     // ---- ダイアログ ----
@@ -185,9 +194,6 @@ class RoutineEditFragment : Fragment() {
             .show()
     }
 
-    /**
-     * タイマーダイアログ — 時・分・秒の NumberPicker 3列 + ティック音選択
-     */
     private fun showTimerDialog(
         existingId: Int = 0,
         existingSeconds: Int = 60,
@@ -203,7 +209,6 @@ class RoutineEditFragment : Fragment() {
         val ctx = requireContext()
         val dp = ctx.resources.displayMetrics.density
 
-        // ---- NumberPicker 3列レイアウト ----
         val pickerRow = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER
@@ -215,38 +220,23 @@ class RoutineEditFragment : Fragment() {
                 orientation = android.widget.LinearLayout.VERTICAL
                 gravity = android.view.Gravity.CENTER
                 layoutParams = android.widget.LinearLayout.LayoutParams(
-                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-                )
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val picker = NumberPicker(ctx).apply {
-                minValue = 0
-                maxValue = max
-                value = init
-                wrapSelectorWheel = true
+                minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true
             }
-            val label = android.widget.TextView(ctx).apply {
-                text = labelText
-                gravity = android.view.Gravity.CENTER
-                setTextColor(
-                    ctx.obtainStyledAttributes(intArrayOf(android.R.attr.textColorSecondary))
-                        .getColor(0, 0x888888).also { it }
-                )
-                textSize = 12f
+            val lbl = android.widget.TextView(ctx).apply {
+                text = labelText; gravity = android.view.Gravity.CENTER; textSize = 12f
             }
-            col.addView(picker)
-            col.addView(label)
+            col.addView(picker); col.addView(lbl)
             return col
         }
 
         val colH = makePicker(23, initH, "時間")
         val colM = makePicker(59, initM, "分")
         val colS = makePicker(59, initS, "秒")
+        pickerRow.addView(colH); pickerRow.addView(colM); pickerRow.addView(colS)
 
-        pickerRow.addView(colH)
-        pickerRow.addView(colM)
-        pickerRow.addView(colS)
-
-        // ---- ティック音選択 ----
         fun tickDisplayName(resName: String?) =
             tickSoundOptions.firstOrNull { it.second == resName }?.first ?: "なし"
 
@@ -256,11 +246,9 @@ class RoutineEditFragment : Fragment() {
             setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
         }
         val tickLabelView = android.widget.TextView(ctx).apply {
-            text = "ティック音"
-            textSize = 14f
+            text = "ティック音"; textSize = 14f
             layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-            )
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         val buttonTick = android.widget.Button(ctx).apply {
             text = tickDisplayName(selectedTickSound)
@@ -278,19 +266,16 @@ class RoutineEditFragment : Fragment() {
                     .show()
             }
         }
-        tickRow.addView(tickLabelView)
-        tickRow.addView(buttonTick)
+        tickRow.addView(tickLabelView); tickRow.addView(buttonTick)
 
-        // ---- 外枠レイアウト ----
         val layout = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            addView(pickerRow)
-            addView(tickRow)
+            addView(pickerRow); addView(tickRow)
         }
 
-        val pickerH = (colH.getChildAt(0) as NumberPicker)
-        val pickerM = (colM.getChildAt(0) as NumberPicker)
-        val pickerS = (colS.getChildAt(0) as NumberPicker)
+        val pickerH = colH.getChildAt(0) as NumberPicker
+        val pickerM = colM.getChildAt(0) as NumberPicker
+        val pickerS = colS.getChildAt(0) as NumberPicker
 
         androidx.appcompat.app.AlertDialog.Builder(ctx)
             .setTitle("タイマー時間")
@@ -305,9 +290,6 @@ class RoutineEditFragment : Fragment() {
             .show()
     }
 
-    /**
-     * アラームダイアログ — 鳴る秒数を NumberPicker（分・秒）に変更
-     */
     private fun showAlarmDialog(
         existingId: Int = 0,
         existingVolume: Int = 80,
@@ -334,15 +316,10 @@ class RoutineEditFragment : Fragment() {
             textSize = 13f
         }
 
-        // 音量
         val editVolume = android.widget.EditText(ctx).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText(existingVolume.toString())
-            hint = "音量（0-100）"
+            setText(existingVolume.toString()); hint = "音量（0-100）"
         }
-
-        // 鳴る時間：分・秒 NumberPicker
-        val durationLabel = label("鳴る時間")
 
         val pickerRow = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
@@ -354,8 +331,7 @@ class RoutineEditFragment : Fragment() {
                 orientation = android.widget.LinearLayout.VERTICAL
                 gravity = android.view.Gravity.CENTER
                 layoutParams = android.widget.LinearLayout.LayoutParams(
-                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-                )
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val picker = NumberPicker(ctx).apply {
                 minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true
@@ -369,13 +345,11 @@ class RoutineEditFragment : Fragment() {
 
         val colM = makePicker(59, initM, "分")
         val colS = makePicker(59, initS, "秒")
-        pickerRow.addView(colM)
-        pickerRow.addView(colS)
+        pickerRow.addView(colM); pickerRow.addView(colS)
 
         val pickerM = colM.getChildAt(0) as NumberPicker
         val pickerS = colS.getChildAt(0) as NumberPicker
 
-        // アラーム音・バイブ
         val checkVibrate = android.widget.CheckBox(ctx).apply {
             text = "バイブレーション"; isChecked = existingVibrate
             setPadding(0, (8 * dp).toInt(), 0, 0)
@@ -397,12 +371,9 @@ class RoutineEditFragment : Fragment() {
             }
         }
 
-        layout.addView(label("音量（0〜100）"))
-        layout.addView(editVolume)
-        layout.addView(durationLabel)
-        layout.addView(pickerRow)
-        layout.addView(label("アラーム音"))
-        layout.addView(buttonSound)
+        layout.addView(label("音量（0〜100）")); layout.addView(editVolume)
+        layout.addView(label("鳴る時間"));      layout.addView(pickerRow)
+        layout.addView(label("アラーム音"));    layout.addView(buttonSound)
         layout.addView(checkVibrate)
 
         androidx.appcompat.app.AlertDialog.Builder(ctx)

@@ -32,14 +32,17 @@ class RoutineItemAdapter(
             binding.textItemType.text = item.label()
             binding.textItemSummary.text = item.summary()
 
-            val indentPx = (entry.depth * 24 *
-                    binding.root.context.resources.displayMetrics.density).toInt()
-            binding.root.setPadding(
-                indentPx,
-                binding.root.paddingTop,
-                binding.root.paddingRight,
-                binding.root.paddingBottom
-            )
+            // depth に応じてカード全体を左インデント（1段あたり20dp）
+            val density = binding.root.context.resources.displayMetrics.density
+            val indentDp = entry.depth * 20
+            val indentPx = (indentDp * density).toInt()
+            val baseSidePx = (12 * density).toInt()
+
+            // CardView の marginStart を depth 分ずらす
+            (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
+                lp.marginStart = baseSidePx + indentPx
+                binding.root.layoutParams = lp
+            }
 
             binding.buttonEdit.visibility =
                 if (item.isEditable()) android.view.View.VISIBLE else android.view.View.GONE
@@ -57,6 +60,15 @@ class RoutineItemAdapter(
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(entry: RoutineListEntry.AddButton) {
+            // depth に応じて左パディングを追加
+            val density = binding.root.context.resources.displayMetrics.density
+            val indentPx = (entry.depth * 20 * density).toInt()
+            binding.root.setPadding(
+                (28 * density).toInt() + indentPx,
+                binding.root.paddingTop,
+                binding.root.paddingRight,
+                binding.root.paddingBottom
+            )
             binding.buttonAddItem.setOnClickListener {
                 onAddButtonClick(entry.insertAfterIndex)
             }
@@ -127,13 +139,19 @@ private fun RoutineItem.label() = when (this) {
 private fun RoutineItem.summary() = when (this) {
     is RoutineItem.LoopStart -> "${count}回繰り返す"
     is RoutineItem.Timer -> {
-        val m = durationSeconds / 60; val s = durationSeconds % 60
-        val timeStr = if (m > 0) "${m}分${s}秒" else "${s}秒"
-        val tickStr = if (tickSound != null) " / ティック: $tickSound" else ""
+        val h = durationSeconds / 3600
+        val m = (durationSeconds % 3600) / 60
+        val s = durationSeconds % 60
+        val timeStr = when {
+            h > 0 -> "${h}時間${m}分${s}秒"
+            m > 0 -> "${m}分${s}秒"
+            else  -> "${s}秒"
+        }
+        val tickStr = if (tickSound != null) " · $tickSound" else ""
         timeStr + tickStr
     }
-    is RoutineItem.Alarm -> "音量${volume}% / ${durationSeconds}秒" +
-            (if (vibrate) " / バイブあり" else "")
+    is RoutineItem.Alarm -> "音量${volume}% · ${durationSeconds}秒" +
+            (if (vibrate) " · バイブあり" else "")
     else -> ""
 }
 

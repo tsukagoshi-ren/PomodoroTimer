@@ -3,4 +3,9 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="highlight_current">#1A6650A4</color>
+
+    <!-- ルーティン編集画面 カード背景（画像に近いダーク系） -->
+    <color name="card_background">#FF2C2C2E</color>
+    <color name="card_text_primary">#FFFFFFFF</color>
+    <color name="card_text_secondary">#99FFFFFF</color>
 </resources>
