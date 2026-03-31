@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    ループ内の追加ボタン専用レイアウト（depth > 0 のAddButtonに使用）。
-    末尾追加は fragment_routine_edit.xml のFABで行う。
--->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -14,7 +10,6 @@
     android:paddingStart="28dp"
     android:paddingEnd="12dp">
 
-    <!-- ループ内であることを示す縦線 -->
     <View
         android:layout_width="2dp"
         android:layout_height="38dp"
@@ -25,7 +20,7 @@
         android:id="@+id/buttonAddItem"
         android:layout_width="wrap_content"
         android:layout_height="38dp"
-        android:text="＋ ループ内に追加"
+        android:text="@string/action_add_in_loop"
         android:textSize="12sp"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"

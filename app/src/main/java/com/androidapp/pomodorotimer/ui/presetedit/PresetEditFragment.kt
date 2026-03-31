@@ -46,25 +46,21 @@ class PresetEditFragment : Fragment() {
         val presetId = arguments?.getInt("presetId", -1) ?: -1
         if (presetId != -1) viewModel.loadPreset(presetId)
 
-        // システムの「戻る」ボタンもキャンセル扱いにする
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
             object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    performCancel()
-                }
+                override fun handleOnBackPressed() { performCancel() }
             }
         )
 
         binding.rowTrigger.setOnClickListener { showTriggerDialog() }
 
-        // ルーティン編集へ遷移（saveAndGetId でID確保）
         binding.rowRoutine.setOnClickListener {
             viewModel.setName(binding.editName.text.toString().trim())
             viewLifecycleOwner.lifecycleScope.launch {
                 val savedId = viewModel.saveAndGetId()
                 if (savedId == null) {
-                    Toast.makeText(requireContext(), "プリセット名を入力してください", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), R.string.error_preset_name_empty, Toast.LENGTH_SHORT).show()
                     return@launch
                 }
                 findNavController().navigate(
@@ -74,10 +70,8 @@ class PresetEditFragment : Fragment() {
             }
         }
 
-        // キャンセルボタン
         binding.buttonCancel.setOnClickListener { performCancel() }
 
-        // 保存ボタン
         binding.buttonSave.setOnClickListener {
             viewModel.setName(binding.editName.text.toString().trim())
             viewLifecycleOwner.lifecycleScope.launch {
@@ -85,14 +79,13 @@ class PresetEditFragment : Fragment() {
                     PresetEditViewModel.SaveResult.OK ->
                         findNavController().popBackStack()
                     PresetEditViewModel.SaveResult.NAME_EMPTY ->
-                        Toast.makeText(requireContext(), "プリセット名を入力してください", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), R.string.error_preset_name_empty, Toast.LENGTH_SHORT).show()
                     PresetEditViewModel.SaveResult.NO_ROUTINE ->
-                        Toast.makeText(requireContext(), "ルーティンを作成してください", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), R.string.error_no_routine, Toast.LENGTH_SHORT).show()
                 }
             }
         }
 
-        // UI状態の反映
         var nameInitialized = false
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.uiState.collect { state ->
@@ -101,21 +94,17 @@ class PresetEditFragment : Fragment() {
                     nameInitialized = true
                 }
                 binding.textTriggerValue.text = when (state.triggerType) {
-                    TriggerType.BUTTON -> "ボタンで開始"
+                    TriggerType.BUTTON -> getString(R.string.trigger_button)
                     TriggerType.DATETIME -> {
                         val dt = state.triggerDatetime
-                        if (dt != null) SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.JAPAN).format(dt)
-                        else "日時を選択"
+                        if (dt != null) SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(dt)
+                        else getString(R.string.trigger_datetime_select)
                     }
                 }
             }
         }
     }
 
-    /**
-     * キャンセル処理。
-     * rowRoutine タップで仮作成したプリセットがあれば削除してから戻る。
-     */
     private fun performCancel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.cancelAndCleanup()
@@ -124,10 +113,12 @@ class PresetEditFragment : Fragment() {
     }
 
     private fun showTriggerDialog() {
-        val options = arrayOf("ボタンで開始", "日時指定")
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("トリガーを選択")
-            .setItems(options) { _, which ->
+            .setTitle(R.string.dialog_trigger_title)
+            .setItems(arrayOf(
+                getString(R.string.trigger_button),
+                getString(R.string.trigger_datetime)
+            )) { _, which ->
                 when (which) {
                     0 -> viewModel.setTrigger(TriggerType.BUTTON, null)
                     1 -> showDateTimePicker()

@@ -18,7 +18,7 @@ class TimerService : Service() {
     private val binder = TimerBinder()
 
     companion object {
-        const val CHANNEL_ID = "timer_channel"
+        const val CHANNEL_ID      = "timer_channel"
         const val NOTIFICATION_ID = 1
     }
 
@@ -28,7 +28,13 @@ class TimerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification("準備中", "タイマーを開始してください"))
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(
+                getString(R.string.timer_state_idle),
+                getString(R.string.timer_hint_start)
+            )
+        )
         return START_NOT_STICKY
     }
 
@@ -57,8 +63,10 @@ class TimerService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID, "タイマー", NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "ポモドーロタイマーの進行状況" }
+                CHANNEL_ID,
+                getString(R.string.notif_channel_timer_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { description = getString(R.string.notif_channel_timer_desc) }
             getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(channel)
         }

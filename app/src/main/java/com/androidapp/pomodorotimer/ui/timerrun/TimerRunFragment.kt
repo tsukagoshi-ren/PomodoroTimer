@@ -1,13 +1,16 @@
 package com.androidapp.pomodorotimer.ui.timerrun
 
-import android.media.AudioAttributes
+import android.Manifest
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.RingtoneManager
-import android.media.SoundPool
+import android.media.*
 import android.os.*
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -26,14 +29,17 @@ class TimerRunFragment : Fragment() {
     }
 
     private lateinit var adapter: TimerRunItemAdapter
-
-    // --- アラーム再生 ---
     private var ringtone: android.media.Ringtone? = null
 
-    // --- ティック音用 SoundPool ---
+    // SoundPool（ティック音用）
     private var soundPool: SoundPool? = null
-    // リソース名 → soundId のキャッシュ
     private val soundIdCache = mutableMapOf<String, Int>()
+
+    // Android 13以上の通知権限リクエスト
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // 許可・拒否どちらでもタイマーは動作する（通知が出ないだけ）
+        }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -44,6 +50,16 @@ class TimerRunFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Android 13以上で通知権限がなければリクエスト
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    requireContext(), Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         initSoundPool()
 
@@ -80,29 +96,29 @@ class TimerRunFragment : Fragment() {
 
                 when (state.runState) {
                     RunState.IDLE -> {
-                        binding.buttonStart.text = "開始"
+                        binding.buttonStart.setText(com.androidapp.pomodorotimer.R.string.action_start)
                         binding.buttonStart.isEnabled = true
                         binding.buttonPause.isEnabled = false
-                        binding.buttonStop.isEnabled = false
+                        binding.buttonStop.isEnabled  = false
                         binding.textFinished.visibility = View.GONE
                     }
                     RunState.RUNNING -> {
                         binding.buttonStart.isEnabled = false
                         binding.buttonPause.isEnabled = true
-                        binding.buttonStop.isEnabled = true
+                        binding.buttonStop.isEnabled  = true
                         binding.textFinished.visibility = View.GONE
                     }
                     RunState.PAUSED -> {
-                        binding.buttonStart.text = "再開"
+                        binding.buttonStart.setText(com.androidapp.pomodorotimer.R.string.action_resume)
                         binding.buttonStart.isEnabled = true
                         binding.buttonPause.isEnabled = false
-                        binding.buttonStop.isEnabled = true
+                        binding.buttonStop.isEnabled  = true
                         binding.textFinished.visibility = View.GONE
                     }
                     RunState.FINISHED -> {
                         binding.buttonStart.isEnabled = false
                         binding.buttonPause.isEnabled = false
-                        binding.buttonStop.isEnabled = false
+                        binding.buttonStop.isEnabled  = false
                         binding.textFinished.visibility = View.VISIBLE
                     }
                 }
@@ -112,8 +128,7 @@ class TimerRunFragment : Fragment() {
         // アラームイベント
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.alarmEvent.collect { event ->
-                if (event != null) playAlarm(event)
-                else stopAlarm()
+                if (event != null) playAlarm(event) else stopAlarm()
             }
         }
 
@@ -132,10 +147,10 @@ class TimerRunFragment : Fragment() {
             }
         }
         binding.buttonPause.setOnClickListener { viewModel.pause() }
-        binding.buttonStop.setOnClickListener { viewModel.stop(); stopAlarm() }
+        binding.buttonStop.setOnClickListener  { viewModel.stop(); stopAlarm() }
     }
 
-    // ---- SoundPool 初期化 ----
+    // ---- SoundPool ----
 
     private fun initSoundPool() {
         val attrs = AudioAttributes.Builder()
@@ -148,25 +163,18 @@ class TimerRunFragment : Fragment() {
             .build()
     }
 
-    /**
-     * リソース名（例: "tick_clock"）から soundId を解決して再生する。
-     * 初回は load、以降はキャッシュから再生。
-     */
     private fun playTick(resourceName: String) {
         val pool = soundPool ?: return
-        val ctx = context ?: return
-
+        val ctx  = context ?: return
         val soundId = soundIdCache.getOrPut(resourceName) {
             val resId = ctx.resources.getIdentifier(resourceName, "raw", ctx.packageName)
-            if (resId == 0) return   // リソースが見つからない場合はスキップ
+            if (resId == 0) return
             pool.load(ctx, resId, 1)
         }
-        // load直後は再生できないが、2回目以降はキャッシュ済みなので即再生される
-        // 初回のみ遅延が出る可能性があるが、実用上問題ない
         pool.play(soundId, 0.8f, 0.8f, 1, 0, 1.0f)
     }
 
-    // ---- アラーム再生 ----
+    // ---- アラーム ----
 
     private fun playAlarm(event: TimerRunViewModel.AlarmEvent) {
         stopAlarm()
@@ -184,7 +192,7 @@ class TimerRunFragment : Fragment() {
                 )
                 r.play()
             }
-        } catch (e: Exception) { /* 無視 */ }
+        } catch (_: Exception) {}
 
         if (event.vibrate) {
             val vibrator = getVibrator()

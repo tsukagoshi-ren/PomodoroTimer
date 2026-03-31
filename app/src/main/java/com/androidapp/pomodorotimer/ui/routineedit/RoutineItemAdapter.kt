@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.androidapp.pomodorotimer.R
 import com.androidapp.pomodorotimer.data.model.RoutineItem
 import com.androidapp.pomodorotimer.databinding.ItemRoutineBinding
 import com.androidapp.pomodorotimer.databinding.ItemRoutineAddButtonBinding
@@ -18,21 +19,11 @@ class RoutineItemAdapter(
 ) : ListAdapter<RoutineListEntry, RecyclerView.ViewHolder>(RoutineDiffCallback) {
 
     var itemTouchHelper: ItemTouchHelper? = null
-
-    /**
-     * グレーアウトする display インデックスの範囲（両端含む）。
-     * null = グレーアウトなし。
-     *
-     * notifyDataSetChanged は submitList と競合してクラッシュするため使わない。
-     * 代わりに影響する行だけ notifyItemRangeChanged で更新する。
-     * これは RecyclerView のレイアウト中でも安全に呼べる。
-     */
     private var greyOutRange: IntRange? = null
 
     fun setGreyOutRange(range: IntRange) {
         val old = greyOutRange
         greyOutRange = range
-        // 変化した範囲を再描画
         val start = minOf(old?.first ?: range.first, range.first)
         val end   = maxOf(old?.last  ?: range.last,  range.last)
         notifyItemRangeChanged(start, end - start + 1)
@@ -56,12 +47,13 @@ class RoutineItemAdapter(
 
         fun bind(entry: RoutineListEntry.Item, isGreyedOut: Boolean) {
             val item = entry.routineItem
-            binding.textItemType.text = item.label()
-            binding.textItemSummary.text = item.summary()
+            val ctx  = binding.root.context
+            binding.textItemType.text    = item.label(ctx)
+            binding.textItemSummary.text = item.summary(ctx)
 
             val density = binding.root.context.resources.displayMetrics.density
             val indentPx = (entry.depth * 20 * density).toInt()
-            val basePx = (12 * density).toInt()
+            val basePx   = (12 * density).toInt()
             (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
                 lp.marginStart = basePx + indentPx
                 binding.root.layoutParams = lp
@@ -89,7 +81,6 @@ class RoutineItemAdapter(
                     }
                 }
             }
-
             binding.root.alpha = if (isGreyedOut) 0.35f else 1.0f
         }
     }
@@ -98,7 +89,7 @@ class RoutineItemAdapter(
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(entry: RoutineListEntry.AddButton, isGreyedOut: Boolean) {
-            val density = binding.root.context.resources.displayMetrics.density
+            val density  = binding.root.context.resources.displayMetrics.density
             val indentPx = (entry.depth * 20 * density).toInt()
             binding.root.setPadding(
                 (28 * density).toInt() + indentPx,
@@ -136,8 +127,6 @@ class RoutineItemAdapter(
         }
     }
 
-    // ---- displayList → _items インデックス変換 ----
-
     fun toItemIndex(displayPos: Int): Int {
         if (displayPos < 0 || displayPos >= currentList.size) return -1
         if (currentList[displayPos] is RoutineListEntry.AddButton) return -1
@@ -147,8 +136,6 @@ class RoutineItemAdapter(
         }
         return count
     }
-
-    // ---- ドラッグ中の表示更新 ----
 
     fun onItemMoved(fromDisplay: Int, toDisplay: Int) {
         val list = currentList.toMutableList()
@@ -160,17 +147,14 @@ class RoutineItemAdapter(
     fun onItemDropped(fromDisplay: Int, toDisplay: Int) {
         val fromItem = toItemIndex(fromDisplay)
         val toItem   = toItemIndex(toDisplay)
-        if (fromItem != -1 && toItem != -1) {
-            onMove(fromItem, toItem)
-        }
+        if (fromItem != -1 && toItem != -1) onMove(fromItem, toItem)
     }
 }
 
 private object RoutineDiffCallback : DiffUtil.ItemCallback<RoutineListEntry>() {
     override fun areItemsTheSame(a: RoutineListEntry, b: RoutineListEntry): Boolean {
         if (a is RoutineListEntry.Item && b is RoutineListEntry.Item)
-            return a.routineItem.id == b.routineItem.id &&
-                    a.routineItem.order == b.routineItem.order
+            return a.routineItem.id == b.routineItem.id && a.routineItem.order == b.routineItem.order
         if (a is RoutineListEntry.AddButton && b is RoutineListEntry.AddButton)
             return a.insertAfterIndex == b.insertAfterIndex
         return false
@@ -178,28 +162,29 @@ private object RoutineDiffCallback : DiffUtil.ItemCallback<RoutineListEntry>() {
     override fun areContentsTheSame(a: RoutineListEntry, b: RoutineListEntry) = a == b
 }
 
-private fun RoutineItem.label() = when (this) {
-    is RoutineItem.LoopStart -> "🔁 ループ開始"
-    is RoutineItem.LoopEnd   -> "🔁 ループ終了"
-    is RoutineItem.Timer     -> "⏱ タイマー"
-    is RoutineItem.Alarm     -> "🔔 アラーム"
+private fun RoutineItem.label(ctx: android.content.Context) = when (this) {
+    is RoutineItem.LoopStart -> ctx.getString(R.string.item_label_loop_start)
+    is RoutineItem.LoopEnd   -> ctx.getString(R.string.item_label_loop_end)
+    is RoutineItem.Timer     -> ctx.getString(R.string.item_label_timer)
+    is RoutineItem.Alarm     -> ctx.getString(R.string.item_label_alarm)
 }
 
-private fun RoutineItem.summary() = when (this) {
-    is RoutineItem.LoopStart -> "${count}回繰り返す"
+private fun RoutineItem.summary(ctx: android.content.Context) = when (this) {
+    is RoutineItem.LoopStart -> ctx.getString(R.string.summary_loop_count, count)
     is RoutineItem.Timer -> {
         val h = durationSeconds / 3600
         val m = (durationSeconds % 3600) / 60
         val s = durationSeconds % 60
         val timeStr = when {
-            h > 0 -> "${h}時間${m}分${s}秒"
-            m > 0 -> "${m}分${s}秒"
-            else  -> "${s}秒"
+            h > 0 -> ctx.getString(R.string.summary_time_hms, h, m, s)
+            m > 0 -> ctx.getString(R.string.summary_time_ms, m, s)
+            else  -> ctx.getString(R.string.summary_time_s, s)
         }
         if (tickSound != null) "$timeStr · $tickSound" else timeStr
     }
-    is RoutineItem.Alarm -> "音量${volume}% · ${durationSeconds}秒" +
-            if (vibrate) " · バイブあり" else ""
+    is RoutineItem.Alarm ->
+        ctx.getString(R.string.summary_alarm, volume, durationSeconds) +
+                if (vibrate) ctx.getString(R.string.summary_vibrate) else ""
     else -> ""
 }
 

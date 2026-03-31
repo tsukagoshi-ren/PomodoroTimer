@@ -12,11 +12,10 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- プリセット名 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="プリセット名"
+            android:text="@string/label_preset_name"
             android:textSize="12sp"
             android:textColor="@color/card_text_secondary"
             android:layout_marginBottom="4dp" />
@@ -26,22 +25,20 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="text"
-            android:hint="例：朝のルーティン"
+            android:hint="@string/hint_preset_name"
             android:textColor="@color/card_text_primary"
             android:textColorHint="@color/card_text_secondary"
             android:backgroundTint="@color/outline"
             android:layout_marginBottom="24dp" />
 
-        <!-- 設定ラベル -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="設定"
+            android:text="@string/label_settings"
             android:textSize="12sp"
             android:textColor="@color/card_text_secondary"
             android:layout_marginBottom="4dp" />
 
-        <!-- トリガー行 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/rowTrigger"
             android:layout_width="match_parent"
@@ -62,7 +59,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="トリガー"
+                    android:text="@string/label_trigger"
                     android:textSize="15sp"
                     android:textColor="@color/card_text_primary"
                     app:layout_constraintTop_toTopOf="parent"
@@ -82,7 +79,6 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ルーティン行 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/rowRoutine"
             android:layout_width="match_parent"
@@ -103,7 +99,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="ルーティン"
+                    android:text="@string/label_routine"
                     android:textSize="15sp"
                     android:textColor="@color/card_text_primary"
                     app:layout_constraintTop_toTopOf="parent"
@@ -113,7 +109,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="編集 ›"
+                    android:text="@string/action_edit_arrow"
                     android:textSize="13sp"
                     android:textColor="@color/card_text_secondary"
                     app:layout_constraintTop_toTopOf="parent"
@@ -123,7 +119,6 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- キャンセル・保存ボタン -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -136,7 +131,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="キャンセル"
+                android:text="@string/action_cancel"
                 android:layout_marginEnd="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
@@ -145,10 +140,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="保存"
+                android:text="@string/action_save"
                 android:layout_marginStart="8dp" />
 
         </LinearLayout>
-
     </LinearLayout>
 </ScrollView>

@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.androidapp.pomodorotimer.R
 import com.androidapp.pomodorotimer.data.model.Preset
 import com.androidapp.pomodorotimer.data.model.TriggerType
 import com.androidapp.pomodorotimer.databinding.ItemPresetBinding
@@ -23,13 +24,14 @@ class PresetAdapter(
         fun bind(preset: Preset) {
             binding.textPresetName.text = preset.name
             binding.textTrigger.text = when (preset.triggerType) {
-                TriggerType.BUTTON -> "ボタンで開始"
+                TriggerType.BUTTON -> binding.root.context.getString(R.string.trigger_button)
                 TriggerType.DATETIME -> {
                     val dt = preset.triggerDatetime
                     if (dt != null) {
-                        val fmt = SimpleDateFormat("MM/dd HH:mm", Locale.JAPAN)
-                        fmt.format(Date(dt))
-                    } else "日時未設定"
+                        SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()).format(Date(dt))
+                    } else {
+                        binding.root.context.getString(R.string.trigger_datetime_unset)
+                    }
                 }
             }
             binding.root.setOnClickListener { onTap(preset) }

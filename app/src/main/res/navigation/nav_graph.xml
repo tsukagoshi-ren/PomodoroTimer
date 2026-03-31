@@ -7,44 +7,31 @@
     <fragment
         android:id="@+id/presetListFragment"
         android:name="com.androidapp.pomodorotimer.ui.list.PresetListFragment"
-        android:label="プリセット一覧">
-        <action
-            android:id="@+id/action_list_to_presetEdit"
-            app:destination="@id/presetEditFragment" />
-        <action
-            android:id="@+id/action_list_to_timerRun"
-            app:destination="@id/timerRunFragment" />
+        android:label="@string/screen_preset_list">
+        <action android:id="@+id/action_list_to_presetEdit" app:destination="@id/presetEditFragment" />
+        <action android:id="@+id/action_list_to_timerRun"   app:destination="@id/timerRunFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/presetEditFragment"
         android:name="com.androidapp.pomodorotimer.ui.presetedit.PresetEditFragment"
-        android:label="プリセット編集">
-        <argument
-            android:name="presetId"
-            app:argType="integer"
-            android:defaultValue="-1" />
-        <action
-            android:id="@+id/action_presetEdit_to_routineEdit"
-            app:destination="@id/routineEditFragment" />
+        android:label="@string/screen_preset_edit">
+        <argument android:name="presetId" app:argType="integer" android:defaultValue="-1" />
+        <action android:id="@+id/action_presetEdit_to_routineEdit" app:destination="@id/routineEditFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/routineEditFragment"
         android:name="com.androidapp.pomodorotimer.ui.routineedit.RoutineEditFragment"
-        android:label="ルーティン編集">
-        <argument
-            android:name="presetId"
-            app:argType="integer" />
+        android:label="@string/screen_routine_edit">
+        <argument android:name="presetId" app:argType="integer" />
     </fragment>
 
     <fragment
         android:id="@+id/timerRunFragment"
         android:name="com.androidapp.pomodorotimer.ui.timerrun.TimerRunFragment"
-        android:label="実行中">
-        <argument
-            android:name="presetId"
-            app:argType="integer" />
+        android:label="@string/screen_timer_run">
+        <argument android:name="presetId" app:argType="integer" />
     </fragment>
 
 </navigation>

@@ -24,19 +24,16 @@ class TimerRunItemAdapter : RecyclerView.Adapter<TimerRunItemAdapter.ViewHolder>
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: RoutineItem, isHighlighted: Boolean) {
-            binding.textItemLabel.text = item.label()
-            binding.textItemSummary.text = item.summary()
+            val ctx = binding.root.context
+            binding.textItemLabel.text   = item.label(ctx)
+            binding.textItemSummary.text = item.summary(ctx)
 
             if (isHighlighted) {
-                binding.root.setBackgroundColor(
-                    ContextCompat.getColor(binding.root.context, R.color.highlight_current)
-                )
+                binding.root.setBackgroundColor(ContextCompat.getColor(ctx, R.color.highlight_current))
                 binding.textItemLabel.setTypeface(null, Typeface.BOLD)
                 binding.indicator.visibility = android.view.View.VISIBLE
             } else {
-                binding.root.setBackgroundColor(
-                    ContextCompat.getColor(binding.root.context, android.R.color.transparent)
-                )
+                binding.root.setBackgroundColor(ContextCompat.getColor(ctx, android.R.color.transparent))
                 binding.textItemLabel.setTypeface(null, Typeface.NORMAL)
                 binding.indicator.visibility = android.view.View.INVISIBLE
             }
@@ -52,16 +49,27 @@ class TimerRunItemAdapter : RecyclerView.Adapter<TimerRunItemAdapter.ViewHolder>
     override fun getItemCount() = items.size
 }
 
-private fun RoutineItem.label() = when (this) {
-    is RoutineItem.Timer     -> "⏱ タイマー"
-    is RoutineItem.Alarm     -> "🔔 アラーム"
-    is RoutineItem.LoopStart -> "🔁 ループ開始"
-    is RoutineItem.LoopEnd   -> "🔁 ループ終了"
+private fun RoutineItem.label(ctx: android.content.Context) = when (this) {
+    is RoutineItem.Timer     -> ctx.getString(R.string.item_label_timer)
+    is RoutineItem.Alarm     -> ctx.getString(R.string.item_label_alarm)
+    is RoutineItem.LoopStart -> ctx.getString(R.string.item_label_loop_start)
+    is RoutineItem.LoopEnd   -> ctx.getString(R.string.item_label_loop_end)
 }
 
-private fun RoutineItem.summary() = when (this) {
-    is RoutineItem.Timer     -> { val m = durationSeconds / 60; val s = durationSeconds % 60; if (m > 0) "${m}分${s}秒" else "${s}秒" }
-    is RoutineItem.Alarm     -> "音量${volume}% / ${durationSeconds}秒" + if (vibrate) " / バイブあり" else ""
-    is RoutineItem.LoopStart -> "${count}回繰り返す"
+private fun RoutineItem.summary(ctx: android.content.Context) = when (this) {
+    is RoutineItem.Timer -> {
+        val h = durationSeconds / 3600
+        val m = (durationSeconds % 3600) / 60
+        val s = durationSeconds % 60
+        when {
+            h > 0 -> ctx.getString(R.string.summary_time_hms, h, m, s)
+            m > 0 -> ctx.getString(R.string.summary_time_ms, m, s)
+            else  -> ctx.getString(R.string.summary_time_s, s)
+        }
+    }
+    is RoutineItem.Alarm ->
+        ctx.getString(R.string.summary_alarm, volume, durationSeconds) +
+                if (vibrate) ctx.getString(R.string.summary_vibrate) else ""
+    is RoutineItem.LoopStart -> ctx.getString(R.string.summary_loop_count, count)
     else -> ""
 }

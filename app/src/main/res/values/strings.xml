@@ -1,3 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">PomodoroTimer</string>
+
+    <!-- 画面タイトル -->
+    <string name="screen_preset_list">プリセット一覧</string>
+    <string name="screen_preset_edit">プリセット編集</string>
+    <string name="screen_routine_edit">ルーティン編集</string>
+    <string name="screen_timer_run">実行中</string>
+
+    <!-- 共通アクション -->
+    <string name="action_save">保存</string>
+    <string name="action_cancel">キャンセル</string>
+    <string name="action_edit">編集</string>
+    <string name="action_delete">削除</string>
+    <string name="action_add">追加</string>
+    <string name="action_ok">OK</string>
+    <string name="action_start">開始</string>
+    <string name="action_resume">再開</string>
+    <string name="action_pause">一時停止</string>
+    <string name="action_stop">停止</string>
+    <string name="action_edit_arrow">編集 ›</string>
+
+    <!-- プリセット一覧 -->
+    <string name="fab_add_preset_desc">プリセットを追加</string>
+    <string name="dialog_delete_title">削除しますか？</string>
+    <string name="dialog_delete_message">「%s」を削除します</string>
+
+    <!-- プリセット編集 -->
+    <string name="label_preset_name">プリセット名</string>
+    <string name="hint_preset_name">例：朝のルーティン</string>
+    <string name="label_settings">設定</string>
+    <string name="label_trigger">トリガー</string>
+    <string name="label_routine">ルーティン</string>
+    <string name="error_preset_name_empty">プリセット名を入力してください</string>
+    <string name="error_no_routine">ルーティンを作成してください</string>
+    <string name="dialog_trigger_title">トリガーを選択</string>
+    <string name="trigger_button">ボタンで開始</string>
+    <string name="trigger_datetime">日時指定</string>
+    <string name="trigger_datetime_select">日時を選択</string>
+    <string name="trigger_datetime_unset">日時未設定</string>
+
+    <!-- ルーティン編集 -->
+    <string name="action_add_item">アイテムを追加</string>
+    <string name="action_add_in_loop">＋ ループ内に追加</string>
+    <string name="dialog_add_item_title">アイテムを追加</string>
+    <string name="item_type_loop">ループ</string>
+    <string name="item_type_timer">タイマー</string>
+    <string name="item_type_alarm">アラーム</string>
+    <string name="dialog_loop_count_title">ループ回数</string>
+    <string name="hint_loop_count">繰り返し回数</string>
+    <string name="dialog_timer_title">タイマー時間</string>
+    <string name="unit_hours">時間</string>
+    <string name="unit_minutes">分</string>
+    <string name="unit_seconds">秒</string>
+    <string name="label_tick_sound">ティック音</string>
+    <string name="dialog_tick_sound_title">ティック音を選択</string>
+    <string name="tick_sound_none">なし</string>
+    <string name="tick_sound_clock">🕐 時計（カチッ）</string>
+    <string name="tick_sound_wood">🪵 木製（コン）</string>
+    <string name="tick_sound_bell">🔔 ベル（リン）</string>
+    <string name="tick_sound_soft">📳 ソフト（ポッ）</string>
+    <string name="tick_sound_beep">📳 ビープ（ピッ）</string>
+    <string name="tick_sound_digital">🎮 デジタル（ブッ）</string>
+    <string name="dialog_alarm_title">アラーム設定</string>
+    <string name="label_alarm_volume">音量（0〜100）</string>
+    <string name="hint_alarm_volume">音量（0-100）</string>
+    <string name="label_alarm_duration">鳴る時間</string>
+    <string name="label_alarm_sound">アラーム音</string>
+    <string name="dialog_alarm_sound_title">アラーム音を選択</string>
+    <string name="label_vibration">バイブレーション</string>
+
+    <!-- アイテム種別ラベル -->
+    <string name="item_label_loop_start">🔁 ループ開始</string>
+    <string name="item_label_loop_end">🔁 ループ終了</string>
+    <string name="item_label_timer">⏱ タイマー</string>
+    <string name="item_label_alarm">🔔 アラーム</string>
+    <string name="desc_drag_handle">並び替え</string>
+
+    <!-- アイテムサマリー -->
+    <string name="summary_loop_count">%d回繰り返す</string>
+    <string name="summary_time_hms">%1$d時間%2$d分%3$d秒</string>
+    <string name="summary_time_ms">%1$d分%2$d秒</string>
+    <string name="summary_time_s">%d秒</string>
+    <string name="summary_alarm">音量%1$d%% · %2$d秒</string>
+    <string name="summary_vibrate"> · バイブあり</string>
+    <string name="summary_alarm_sound">🎵 %s</string>
+
+    <!-- タイマー実行 -->
+    <string name="label_finished">✅ 完了！</string>
+    <string name="timer_state_idle">準備中</string>
+    <string name="timer_hint_start">タイマーを開始してください</string>
+
+    <!-- 通知 -->
+    <string name="notif_alarm_title">タイマー開始</string>
+    <string name="notif_alarm_text">タップして開始してください</string>
+    <string name="notif_channel_alarm_name">タイマー予約</string>
+    <string name="notif_channel_timer_name">タイマー</string>
+    <string name="notif_channel_timer_desc">ポモドーロタイマーの進行状況</string>
 </resources>

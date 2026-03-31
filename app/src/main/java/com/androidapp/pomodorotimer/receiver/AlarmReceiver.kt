@@ -17,7 +17,6 @@ class AlarmReceiver : BroadcastReceiver() {
         val presetId = intent.getIntExtra(EXTRA_PRESET_ID, -1)
         if (presetId == -1) return
 
-        // 通知を出してタップでTimerRunFragmentへ遷移させる
         val activityIntent = Intent(context, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_PRESET_ID, presetId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -31,8 +30,8 @@ class AlarmReceiver : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("タイマー開始")
-            .setContentText("タップして開始してください")
+            .setContentTitle(context.getString(R.string.notif_alarm_title))
+            .setContentText(context.getString(R.string.notif_alarm_text))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
@@ -44,7 +43,9 @@ class AlarmReceiver : BroadcastReceiver() {
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID, "タイマー予約", NotificationManager.IMPORTANCE_HIGH
+                CHANNEL_ID,
+                context.getString(R.string.notif_channel_alarm_name),
+                NotificationManager.IMPORTANCE_HIGH
             )
             context.getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(channel)

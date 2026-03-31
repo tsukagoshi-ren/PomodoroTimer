@@ -34,17 +34,22 @@ class PresetListFragment : Fragment() {
         onLongPress = { preset ->
             AlertDialog.Builder(requireContext())
                 .setTitle(preset.name)
-                .setItems(arrayOf("編集", "削除")) { _, which ->
+                .setItems(arrayOf(
+                    getString(R.string.action_edit),
+                    getString(R.string.action_delete)
+                )) { _, which ->
                     when (which) {
                         0 -> findNavController().navigate(
                             R.id.action_list_to_presetEdit,
                             Bundle().apply { putInt("presetId", preset.id) }
                         )
                         1 -> AlertDialog.Builder(requireContext())
-                            .setTitle("削除しますか？")
-                            .setMessage("「${preset.name}」を削除します")
-                            .setPositiveButton("削除") { _, _ -> viewModel.deletePreset(preset) }
-                            .setNegativeButton("キャンセル", null)
+                            .setTitle(R.string.dialog_delete_title)
+                            .setMessage(getString(R.string.dialog_delete_message, preset.name))
+                            .setPositiveButton(R.string.action_delete) { _, _ ->
+                                viewModel.deletePreset(preset)
+                            }
+                            .setNegativeButton(R.string.action_cancel, null)
                             .show()
                     }
                 }
