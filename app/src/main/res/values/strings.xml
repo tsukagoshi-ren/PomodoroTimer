@@ -54,6 +54,10 @@
     <string name="unit_minutes">分</string>
     <string name="unit_seconds">秒</string>
     <string name="label_tick_sound">ティック音</string>
+    <string name="label_tick_volume">Tick音量</string>
+    <string name="unit_times">回</string>
+    <string name="action_preview_play">▶</string>
+    <string name="action_preview_stop">■</string>
     <string name="dialog_tick_sound_title">ティック音を選択</string>
     <string name="tick_sound_none">なし</string>
     <string name="tick_sound_clock">🕐 時計（カチッ）</string>

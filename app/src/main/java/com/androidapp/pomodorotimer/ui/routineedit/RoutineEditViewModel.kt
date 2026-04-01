@@ -37,13 +37,6 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
             .mapIndexed { i, it -> reorder(it, i) }
     }
 
-    /**
-     * ドラッグ&ドロップによる並び替え。[from]/[to] は _items リスト上のインデックス。
-     *
-     * LoopEnd     → 移動不可
-     * LoopStart   → 対応 LoopEnd までをブロックとして移動（ブロック内へのドロップは無効）
-     * Timer/Alarm → 単体で自由移動
-     */
     fun moveItem(from: Int, to: Int) {
         val list = _items.value.toMutableList()
         if (from < 0 || to < 0 || from >= list.size || to >= list.size || from == to) return
@@ -54,20 +47,16 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
             is RoutineItem.LoopStart -> {
                 val endIndex = findMatchingLoopEnd(list, from)
                 if (endIndex == -1) return
-                if (to in from..endIndex) return   // ブロック内へのドロップは無効
+                if (to in from..endIndex) return
 
                 val block = list.subList(from, endIndex + 1).toList()
                 repeat(block.size) { list.removeAt(from) }
-                // from より後ろへ移動する場合、block を取り除いた分インデックスがずれる
                 val insertAt = if (to > endIndex) to - block.size + 1 else to
                 block.forEachIndexed { i, item -> list.add(insertAt + i, item) }
             }
 
             else -> {
-                // Timer / Alarm: 単体で自由移動
-                // removeAt(from) した後のリストに対して to を調整する必要がある
                 val moved = list.removeAt(from)
-                // from より後ろへ移動する場合は removeAt でインデックスが1つずれる
                 val insertAt = if (to > from) to - 1 else to
                 list.add(insertAt.coerceIn(0, list.size), moved)
             }
@@ -86,13 +75,23 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
         _items.value = list.mapIndexed { i, item -> reorder(item, i) }
     }
 
-    fun addTimer(seconds: Int, tickSound: String?, insertAfterIndex: Int?) =
-        insertItem(RoutineItem.Timer(order = 0, durationSeconds = seconds, tickSound = tickSound), insertAfterIndex)
+    fun addTimer(seconds: Int, tickSound: String?, tickVolume: Int, insertAfterIndex: Int?) =
+        insertItem(
+            RoutineItem.Timer(
+                order = 0,
+                durationSeconds = seconds,
+                tickSound = tickSound,
+                tickVolume = tickVolume
+            ),
+            insertAfterIndex
+        )
 
     fun addAlarm(volume: Int, duration: Int, soundUri: String, vibrate: Boolean, insertAfterIndex: Int?) =
         insertItem(
-            RoutineItem.Alarm(order = 0, volume = volume, durationSeconds = duration,
-                soundUri = soundUri, vibrate = vibrate),
+            RoutineItem.Alarm(
+                order = 0, volume = volume, durationSeconds = duration,
+                soundUri = soundUri, vibrate = vibrate
+            ),
             insertAfterIndex
         )
 
@@ -100,9 +99,9 @@ class RoutineEditViewModel(private val repository: PresetRepository) : ViewModel
         if (item is RoutineItem.LoopStart && item.id == id) item.copy(count = count) else item
     }
 
-    fun updateTimer(id: Int, seconds: Int, tickSound: String?) = updateItem { item ->
+    fun updateTimer(id: Int, seconds: Int, tickSound: String?, tickVolume: Int) = updateItem { item ->
         if (item is RoutineItem.Timer && item.id == id)
-            item.copy(durationSeconds = seconds, tickSound = tickSound)
+            item.copy(durationSeconds = seconds, tickSound = tickSound, tickVolume = tickVolume)
         else item
     }
 

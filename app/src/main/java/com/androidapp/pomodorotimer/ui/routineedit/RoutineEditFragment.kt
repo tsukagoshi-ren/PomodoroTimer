@@ -3,7 +3,11 @@ package com.androidapp.pomodorotimer.ui.routineedit
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Canvas
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.Ringtone
 import android.media.RingtoneManager
+import android.media.SoundPool
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -13,7 +17,10 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.NumberPicker
+import android.widget.SeekBar
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
@@ -43,6 +50,7 @@ class RoutineEditFragment : Fragment() {
     private lateinit var dragHelper: LoopBlockDragHelper
     private var presetId: Int = -1
 
+    // アラーム音選択
     private var onSoundPicked: ((Uri) -> Unit)? = null
     private val soundPickerLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -57,7 +65,7 @@ class RoutineEditFragment : Fragment() {
             }
         }
 
-    // ティック音の選択肢は strings.xml から取得する
+    // Tick音の選択肢
     private val tickSoundOptions: List<Pair<String, String?>> by lazy {
         listOf(
             getString(R.string.tick_sound_none)    to null,
@@ -69,6 +77,15 @@ class RoutineEditFragment : Fragment() {
             getString(R.string.tick_sound_digital) to "tick_digital",
         )
     }
+
+    // SoundPool（プレビュー用）
+    private var soundPool: SoundPool? = null
+    private val soundIdCache = mutableMapOf<String, Int>()
+    private var currentTickStreamId: Int = 0
+
+    // アラームプレビュー用
+    private var previewRingtone: Ringtone? = null
+    private var previewRingtoneUri: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -82,6 +99,7 @@ class RoutineEditFragment : Fragment() {
 
         presetId = arguments?.getInt("presetId") ?: return
         dragHelper = LoopBlockDragHelper(binding.recyclerView)
+        initSoundPool()
 
         val menuHost: MenuHost = requireActivity()
         menuHost.addMenuProvider(object : MenuProvider {
@@ -256,9 +274,75 @@ class RoutineEditFragment : Fragment() {
         binding.fabAddItem.setOnClickListener { showAddItemDialog(null) }
     }
 
+    // ---- SoundPool ----
+
+    private fun initSoundPool() {
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        soundPool = SoundPool.Builder().setMaxStreams(2).setAudioAttributes(attrs).build()
+    }
+
+    /** Tick音を1回再生してプレビュー（再生中なら停止） */
+    private fun previewTickSound(resourceName: String?, volume: Float, isPlaying: Boolean): Boolean {
+        val pool = soundPool ?: return false
+        val ctx  = context ?: return false
+        if (isPlaying) {
+            pool.stop(currentTickStreamId)
+            return false
+        }
+        if (resourceName == null) return false
+        val soundId = soundIdCache.getOrPut(resourceName) {
+            val resId = ctx.resources.getIdentifier(resourceName, "raw", ctx.packageName)
+            if (resId == 0) return false
+            pool.load(ctx, resId, 1)
+        }
+        // SoundPool はロード完了前に play すると無音なので少し待つ
+        pool.setOnLoadCompleteListener { _, _, _ -> }
+        currentTickStreamId = pool.play(soundId, volume, volume, 1, 0, 1.0f)
+        return true
+    }
+
+    /** アラーム音プレビュー（再生中なら停止、停止中なら再生） */
+    private fun previewAlarmSound(uriString: String, volume: Int, isPlaying: Boolean): Boolean {
+        if (isPlaying) {
+            previewRingtone?.stop()
+            previewRingtone = null
+            previewRingtoneUri = null
+            return false
+        }
+        try {
+            val ctx = requireContext()
+            val uri = Uri.parse(uriString)
+            previewRingtone = RingtoneManager.getRingtone(ctx, uri)?.also { r ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) r.isLooping = false
+                val audioManager = ctx.getSystemService(android.content.Context.AUDIO_SERVICE) as AudioManager
+                val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    (max * volume / 100).coerceIn(0, max),
+                    0
+                )
+                r.play()
+            }
+            previewRingtoneUri = uriString
+        } catch (_: Exception) {}
+        return true
+    }
+
+    private fun stopAllPreviews() {
+        soundPool?.stop(currentTickStreamId)
+        currentTickStreamId = 0
+        previewRingtone?.stop()
+        previewRingtone = null
+        previewRingtoneUri = null
+    }
+
     // ---- ダイアログ ----
 
     private fun showAddItemDialog(insertAfterIndex: Int?) {
+        stopAllPreviews()
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle(R.string.dialog_add_item_title)
             .setItems(arrayOf(
@@ -275,40 +359,71 @@ class RoutineEditFragment : Fragment() {
             .show()
     }
 
-    private fun showLoopDialog(existingId: Int = 0, existingCount: Int = 3, insertAfterIndex: Int? = null) {
-        val input = android.widget.EditText(requireContext()).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText(existingCount.toString())
-            hint = getString(R.string.hint_loop_count)
-        }
+    // ---- ループダイアログ（ドラムロール 1〜99） ----
+
+    private fun showLoopDialog(
+        existingId: Int = 0,
+        existingCount: Int = 3,
+        insertAfterIndex: Int? = null
+    ) {
+        val ctx = requireContext()
+        val dp  = ctx.resources.displayMetrics.density
         val isNew = existingId == 0
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+
+        val picker = NumberPicker(ctx).apply {
+            minValue = 1
+            maxValue = 99
+            value = existingCount.coerceIn(1, 99)
+            wrapSelectorWheel = false
+        }
+
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, (16 * dp).toInt(), 0, (8 * dp).toInt())
+            addView(picker)
+            addView(TextView(ctx).apply {
+                text = ctx.getString(R.string.unit_times)
+                gravity = android.view.Gravity.CENTER
+                textSize = 13f
+            })
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(ctx)
             .setTitle(R.string.dialog_loop_count_title)
-            .setView(input)
+            .setView(container)
             .setPositiveButton(if (isNew) R.string.action_add else R.string.action_ok) { _, _ ->
-                val count = input.text.toString().toIntOrNull() ?: return@setPositiveButton
-                if (isNew) viewModel.addLoop(count, insertAfterIndex)
-                else       viewModel.updateLoopStart(existingId, count)
+                if (isNew) viewModel.addLoop(picker.value, insertAfterIndex)
+                else       viewModel.updateLoopStart(existingId, picker.value)
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
+    // ---- タイマーダイアログ ----
+
     private fun showTimerDialog(
         existingId: Int = 0,
         existingSeconds: Int = 60,
         existingTickSound: String? = null,
+        existingTickVolume: Int = 80,
         insertAfterIndex: Int? = null
     ) {
-        var selectedTickSound: String? = existingTickSound
+        val ctx = requireContext()
+        val dp  = ctx.resources.displayMetrics.density
+        val isNew = existingId == 0
+
+        var selectedTickSound  = existingTickSound
+        var selectedTickVolume = existingTickVolume
+        var tickPreviewPlaying = false
+
         val initH = existingSeconds / 3600
         val initM = (existingSeconds % 3600) / 60
         val initS = existingSeconds % 60
-        val ctx = requireContext()
-        val dp  = ctx.resources.displayMetrics.density
 
-        val pickerRow = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
+        // ── 時間ピッカー行 ──
+        val pickerRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER
             setPadding(0, (16 * dp).toInt(), 0, 0)
         }
@@ -320,8 +435,16 @@ class RoutineEditFragment : Fragment() {
                 layoutParams = android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-            NumberPicker(ctx).apply { minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true; col.addView(this) }
-            android.widget.TextView(ctx).apply { text = ctx.getString(labelRes); gravity = android.view.Gravity.CENTER; textSize = 12f; col.addView(this) }
+            NumberPicker(ctx).apply {
+                minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true
+                col.addView(this)
+            }
+            android.widget.TextView(ctx).apply {
+                text = ctx.getString(labelRes)
+                gravity = android.view.Gravity.CENTER
+                textSize = 12f
+                col.addView(this)
+            }
             return col
         }
 
@@ -330,53 +453,148 @@ class RoutineEditFragment : Fragment() {
         val colS = makePicker(59, initS, R.string.unit_seconds)
         pickerRow.addView(colH); pickerRow.addView(colM); pickerRow.addView(colS)
 
-        fun tickDisplayName(resName: String?) =
-            tickSoundOptions.firstOrNull { it.second == resName }?.first ?: getString(R.string.tick_sound_none)
+        val pickerH = colH.getChildAt(0) as NumberPicker
+        val pickerM = colM.getChildAt(0) as NumberPicker
+        val pickerS = colS.getChildAt(0) as NumberPicker
 
-        val tickRow = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
+        // ── Tick音選択行（プレビューボタンを選択ボタンの左隣に配置） ──
+        fun tickDisplayName(resName: String?) =
+            tickSoundOptions.firstOrNull { it.second == resName }?.first
+                ?: getString(R.string.tick_sound_none)
+
+        val tickSoundRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
+            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), 0)
         }
         android.widget.TextView(ctx).apply {
-            text = ctx.getString(R.string.label_tick_sound); textSize = 14f
-            layoutParams = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            tickRow.addView(this)
+            text = ctx.getString(R.string.label_tick_sound)
+            textSize = 14f
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            tickSoundRow.addView(this)
         }
-        val tickButton = android.widget.Button(ctx).apply { text = tickDisplayName(selectedTickSound); tickRow.addView(this) }
-        tickButton.setOnClickListener {
+        // プレビューボタン（背景なし・テキストのみ）
+        val tickPreviewButton = android.widget.TextView(ctx).apply {
+            text = ctx.getString(R.string.action_preview_play)
+            textSize = 13f
+            setTextColor(android.graphics.Color.parseColor("#FF2196F3"))
+            setPadding((8 * dp).toInt(), (8 * dp).toInt(), (4 * dp).toInt(), (8 * dp).toInt())
+            isClickable = true
+            isFocusable = true
+            val tv = android.util.TypedValue()
+            ctx.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+            background = androidx.core.content.ContextCompat.getDrawable(ctx, tv.resourceId)
+        }
+        val tickSoundButton = android.widget.Button(ctx).apply {
+            text = tickDisplayName(selectedTickSound)
+        }
+        tickSoundRow.addView(tickPreviewButton)
+        tickSoundRow.addView(tickSoundButton)
+
+        // ── Tick音量スライダー行 ──
+        val tickVolumeRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), 0)
+        }
+        android.widget.TextView(ctx).apply {
+            text = ctx.getString(R.string.label_tick_volume)
+            textSize = 14f
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT)
+            setPadding(0, 0, (8 * dp).toInt(), 0)
+            tickVolumeRow.addView(this)
+        }
+        val tickVolumeLabel = android.widget.TextView(ctx).apply {
+            text = "$selectedTickVolume"
+            textSize = 13f
+            minWidth = (32 * dp).toInt()
+            gravity = android.view.Gravity.END
+        }
+        val tickVolumeSeek = SeekBar(ctx).apply {
+            max = 100
+            progress = selectedTickVolume
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    selectedTickVolume = progress
+                    tickVolumeLabel.text = "$progress"
+                }
+                override fun onStartTrackingTouch(sb: SeekBar) {}
+                override fun onStopTrackingTouch(sb: SeekBar) {}
+            })
+        }
+        tickVolumeRow.addView(tickVolumeSeek)
+        tickVolumeRow.addView(tickVolumeLabel)
+
+        // Tick音選択 → ボタンラベル更新、プレビュー停止
+        tickSoundButton.setOnClickListener {
+            if (tickPreviewPlaying) {
+                soundPool?.stop(currentTickStreamId)
+                tickPreviewPlaying = false
+                tickPreviewButton.text = ctx.getString(R.string.action_preview_play)
+            }
             val names  = tickSoundOptions.map { it.first }.toTypedArray()
             val curIdx = tickSoundOptions.indexOfFirst { it.second == selectedTickSound }.coerceAtLeast(0)
             androidx.appcompat.app.AlertDialog.Builder(ctx)
                 .setTitle(R.string.dialog_tick_sound_title)
                 .setSingleChoiceItems(names, curIdx) { dialog, which ->
                     selectedTickSound = tickSoundOptions[which].second
-                    tickButton.text   = tickSoundOptions[which].first
+                    tickSoundButton.text = tickSoundOptions[which].first
                     dialog.dismiss()
                 }
                 .setNegativeButton(R.string.action_cancel, null)
                 .show()
         }
 
-        val layout = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.VERTICAL; addView(pickerRow); addView(tickRow)
+        // Tick音プレビュー（再生終了後に1.5秒で自動リセット）
+        tickPreviewButton.setOnClickListener {
+            if (tickPreviewPlaying) {
+                soundPool?.stop(currentTickStreamId)
+                tickPreviewPlaying = false
+                tickPreviewButton.text = ctx.getString(R.string.action_preview_play)
+            } else {
+                val played = previewTickSound(selectedTickSound, selectedTickVolume / 100f, false)
+                if (played) {
+                    tickPreviewPlaying = true
+                    tickPreviewButton.text = ctx.getString(R.string.action_preview_stop)
+                    tickPreviewButton.postDelayed({
+                        if (tickPreviewPlaying) {
+                            tickPreviewPlaying = false
+                            tickPreviewButton.text = ctx.getString(R.string.action_preview_play)
+                        }
+                    }, 1500L)
+                }
+            }
         }
-        val pickerH = colH.getChildAt(0) as NumberPicker
-        val pickerM = colM.getChildAt(0) as NumberPicker
-        val pickerS = colS.getChildAt(0) as NumberPicker
 
-        androidx.appcompat.app.AlertDialog.Builder(ctx)
+        val layout = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(pickerRow)
+            addView(tickSoundRow)
+            addView(tickVolumeRow)
+        }
+
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(ctx)
             .setTitle(R.string.dialog_timer_title)
             .setView(layout)
             .setPositiveButton(R.string.action_ok) { _, _ ->
+                stopAllPreviews()
                 val total = pickerH.value * 3600 + pickerM.value * 60 + pickerS.value
                 if (total <= 0) return@setPositiveButton
-                if (existingId == 0) viewModel.addTimer(total, selectedTickSound, insertAfterIndex)
-                else                 viewModel.updateTimer(existingId, total, selectedTickSound)
+                if (isNew) viewModel.addTimer(total, selectedTickSound, selectedTickVolume, insertAfterIndex)
+                else       viewModel.updateTimer(existingId, total, selectedTickSound, selectedTickVolume)
             }
-            .setNegativeButton(R.string.action_cancel, null)
-            .show()
+            .setNegativeButton(R.string.action_cancel) { _, _ -> stopAllPreviews() }
+            .setOnDismissListener { stopAllPreviews() }
+            .create()
+        dialog.show()
     }
+
+    // ---- アラームダイアログ ----
 
     private fun showAlarmDialog(
         existingId: Int = 0,
@@ -386,56 +604,133 @@ class RoutineEditFragment : Fragment() {
         existingSoundUri: String = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM).toString(),
         insertAfterIndex: Int? = null
     ) {
-        var currentSoundUri = existingSoundUri
         val ctx  = requireContext()
         val dp   = ctx.resources.displayMetrics.density
+        val isNew = existingId == 0
         val initM = existingDuration / 60
         val initS = existingDuration % 60
 
-        val layout = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
+        var currentSoundUri   = existingSoundUri
+        var selectedVolume    = existingVolume
+        var alarmPreviewPlaying = false
+
+        val layout = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), 0)
         }
 
-        fun label(textRes: Int) = android.widget.TextView(ctx).apply {
-            text = ctx.getString(textRes)
-            setPadding(0, (12 * dp).toInt(), 0, (4 * dp).toInt()); textSize = 13f
+        fun label(text: String) = android.widget.TextView(ctx).apply {
+            this.text = text
+            setPadding(0, (12 * dp).toInt(), 0, (4 * dp).toInt())
+            textSize = 13f
         }
 
-        val editVolume = android.widget.EditText(ctx).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText(existingVolume.toString())
-            hint = ctx.getString(R.string.hint_alarm_volume)
-        }
+        // ── 音量スライダー ──
+        layout.addView(label(ctx.getString(R.string.label_alarm_volume)))
 
-        val pickerRow = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER
+        val volumeRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
         }
+        val volumeLabel = android.widget.TextView(ctx).apply {
+            text = "$selectedVolume"
+            textSize = 13f
+            minWidth = (36 * dp).toInt()
+            gravity = android.view.Gravity.END
+            setPadding(0, 0, (8 * dp).toInt(), 0)
+        }
+        val volumeSeek = SeekBar(ctx).apply {
+            max = 100
+            progress = selectedVolume
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    selectedVolume = progress
+                    volumeLabel.text = "$progress"
+                }
+                override fun onStartTrackingTouch(sb: SeekBar) {}
+                override fun onStopTrackingTouch(sb: SeekBar) {}
+            })
+        }
+        volumeRow.addView(volumeSeek)
+        volumeRow.addView(volumeLabel)
+        layout.addView(volumeRow)
 
+        // ── 鳴る時間ピッカー ──
+        layout.addView(label(ctx.getString(R.string.label_alarm_duration)))
+
+        val pickerRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+        }
         fun makePicker(max: Int, init: Int, labelRes: Int): android.widget.LinearLayout {
             val col = android.widget.LinearLayout(ctx).apply {
-                orientation = android.widget.LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER
-                layoutParams = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                orientation = android.widget.LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-            NumberPicker(ctx).apply { minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true; col.addView(this) }
-            android.widget.TextView(ctx).apply { text = ctx.getString(labelRes); gravity = android.view.Gravity.CENTER; textSize = 12f; col.addView(this) }
+            NumberPicker(ctx).apply {
+                minValue = 0; maxValue = max; value = init; wrapSelectorWheel = true
+                col.addView(this)
+            }
+            android.widget.TextView(ctx).apply {
+                text = ctx.getString(labelRes)
+                gravity = android.view.Gravity.CENTER
+                textSize = 12f
+                col.addView(this)
+            }
             return col
         }
-
         val colM = makePicker(59, initM, R.string.unit_minutes)
         val colS = makePicker(59, initS, R.string.unit_seconds)
         pickerRow.addView(colM); pickerRow.addView(colS)
         val pickerM = colM.getChildAt(0) as NumberPicker
         val pickerS = colS.getChildAt(0) as NumberPicker
+        layout.addView(pickerRow)
 
+        // ── バイブレーション ──
         val checkVibrate = android.widget.CheckBox(ctx).apply {
-            text = ctx.getString(R.string.label_vibration); isChecked = existingVibrate
+            text = ctx.getString(R.string.label_vibration)
+            isChecked = existingVibrate
             setPadding(0, (8 * dp).toInt(), 0, 0)
+        }
+        layout.addView(checkVibrate)
+
+        // ── アラーム音選択 + プレビュー ──
+        layout.addView(label(ctx.getString(R.string.label_alarm_sound)))
+
+        val soundRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, (4 * dp).toInt(), 0, 0)
         }
         val buttonSound = android.widget.Button(ctx).apply {
             text = ctx.getString(R.string.summary_alarm_sound, getRingtoneName(existingSoundUri))
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
+        val previewButton = android.widget.Button(ctx).apply {
+            text = ctx.getString(R.string.action_preview_play)
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).also {
+                (it as android.widget.LinearLayout.LayoutParams).marginStart = (8 * dp).toInt()
+            }
+        }
+        soundRow.addView(buttonSound)
+        soundRow.addView(previewButton)
+        layout.addView(soundRow)
+
+        // 音選択
         buttonSound.setOnClickListener {
+            if (alarmPreviewPlaying) {
+                previewRingtone?.stop()
+                previewRingtone = null
+                alarmPreviewPlaying = false
+                previewButton.text = ctx.getString(R.string.action_preview_play)
+            }
             onSoundPicked = { uri ->
                 currentSoundUri = uri.toString()
                 buttonSound.text = ctx.getString(R.string.summary_alarm_sound, getRingtoneName(uri.toString()))
@@ -449,42 +744,58 @@ class RoutineEditFragment : Fragment() {
             })
         }
 
-        layout.addView(label(R.string.label_alarm_volume));   layout.addView(editVolume)
-        layout.addView(label(R.string.label_alarm_duration));  layout.addView(pickerRow)
-        layout.addView(label(R.string.label_alarm_sound));     layout.addView(buttonSound)
-        layout.addView(checkVibrate)
+        // プレビュー
+        previewButton.setOnClickListener {
+            alarmPreviewPlaying = previewAlarmSound(currentSoundUri, selectedVolume, alarmPreviewPlaying)
+            previewButton.text = ctx.getString(
+                if (alarmPreviewPlaying) R.string.action_preview_stop
+                else R.string.action_preview_play
+            )
+        }
 
-        androidx.appcompat.app.AlertDialog.Builder(ctx)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(ctx)
             .setTitle(R.string.dialog_alarm_title)
             .setView(layout)
             .setPositiveButton(R.string.action_ok) { _, _ ->
-                val vol = editVolume.text.toString().toIntOrNull()?.coerceIn(0, 100) ?: return@setPositiveButton
+                stopAllPreviews()
                 val dur = pickerM.value * 60 + pickerS.value
                 if (dur <= 0) return@setPositiveButton
                 val vib = checkVibrate.isChecked
-                if (existingId == 0) viewModel.addAlarm(vol, dur, currentSoundUri, vib, insertAfterIndex)
-                else                 viewModel.updateAlarm(existingId, vol, dur, currentSoundUri, vib)
+                if (isNew) viewModel.addAlarm(selectedVolume, dur, currentSoundUri, vib, insertAfterIndex)
+                else       viewModel.updateAlarm(existingId, selectedVolume, dur, currentSoundUri, vib)
             }
-            .setNegativeButton(R.string.action_cancel, null)
-            .show()
+            .setNegativeButton(R.string.action_cancel) { _, _ -> stopAllPreviews() }
+            .setOnDismissListener { stopAllPreviews() }
+            .create()
+        dialog.show()
     }
 
     private fun showEditDialog(item: RoutineItem) {
         when (item) {
             is RoutineItem.LoopStart -> showLoopDialog(item.id, item.count)
-            is RoutineItem.Timer     -> showTimerDialog(item.id, item.durationSeconds, item.tickSound)
+            is RoutineItem.Timer     -> showTimerDialog(item.id, item.durationSeconds, item.tickSound, item.tickVolume)
             is RoutineItem.Alarm     -> showAlarmDialog(item.id, item.volume, item.durationSeconds, item.vibrate, item.soundUri)
             else -> {}
         }
     }
 
     private fun getRingtoneName(uriString: String): String = try {
-        RingtoneManager.getRingtone(requireContext(), Uri.parse(uriString))?.getTitle(requireContext()) ?: ""
+        RingtoneManager.getRingtone(requireContext(), Uri.parse(uriString))
+            ?.getTitle(requireContext()) ?: ""
     } catch (_: Exception) { "" }
 
     override fun onDestroyView() {
+        stopAllPreviews()
+        soundPool?.release()
+        soundPool = null
+        soundIdCache.clear()
         dragHelper.stopOverlay()
         super.onDestroyView()
         _binding = null
     }
+}
+
+// Button に OutlinedButton スタイル相当を適用するヘルパー（拡張関数）
+private fun android.widget.Button.style(ctx: android.content.Context) {
+    // デフォルトのまま（テーマに従う）
 }

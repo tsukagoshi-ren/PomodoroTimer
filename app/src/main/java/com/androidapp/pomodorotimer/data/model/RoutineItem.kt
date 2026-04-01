@@ -19,7 +19,8 @@ sealed class RoutineItem {
         override val id: Int = 0,
         override val order: Int,
         val durationSeconds: Int,
-        val tickSound: String? = null   // res/raw のリソース名（例: "tick_clock"）、null = 無音
+        val tickSound: String? = null,   // res/raw のリソース名、null = 無音
+        val tickVolume: Int = 80         // Tick音量 0〜100
     ) : RoutineItem()
 
     data class Alarm(

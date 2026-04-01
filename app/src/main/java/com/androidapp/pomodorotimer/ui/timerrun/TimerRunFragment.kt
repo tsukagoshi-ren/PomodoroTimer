@@ -132,10 +132,10 @@ class TimerRunFragment : Fragment() {
             }
         }
 
-        // ティック音イベント
+        // ティック音イベント（TimerRunFragment の collect 箇所を下記に差し替え）
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tickEvent.collect { resourceName ->
-                if (resourceName != null) playTick(resourceName)
+            viewModel.tickEvent.collect { event ->
+                if (event != null) playTick(event.resourceName, event.volume)
             }
         }
 
@@ -163,7 +163,7 @@ class TimerRunFragment : Fragment() {
             .build()
     }
 
-    private fun playTick(resourceName: String) {
+    private fun playTick(resourceName: String, volume: Float) {
         val pool = soundPool ?: return
         val ctx  = context ?: return
         val soundId = soundIdCache.getOrPut(resourceName) {
@@ -171,7 +171,7 @@ class TimerRunFragment : Fragment() {
             if (resId == 0) return
             pool.load(ctx, resId, 1)
         }
-        pool.play(soundId, 0.8f, 0.8f, 1, 0, 1.0f)
+        pool.play(soundId, volume, volume, 1, 0, 1.0f)
     }
 
     // ---- アラーム ----

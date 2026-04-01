@@ -32,12 +32,16 @@ data class RoutineItemEntity(
     val alarmDurationSeconds: Int? = null,
     val soundUri: String? = null,
     val vibrate: Boolean? = null,
-    val tickSound: String? = null       // v4追加: Timerのティック音リソース名
+    val tickSound: String? = null,      // v4追加
+    val tickVolume: Int? = null         // v6追加: Tick音量 0〜100
 ) {
     fun toRoutineItem(): RoutineItem = when (type) {
         "LOOP_START" -> RoutineItem.LoopStart(id, order, repeatCount!!)
         "LOOP_END"   -> RoutineItem.LoopEnd(id, order)
-        "TIMER"      -> RoutineItem.Timer(id, order, durationSeconds!!, tickSound)
+        "TIMER"      -> RoutineItem.Timer(
+            id, order, durationSeconds!!, tickSound,
+            tickVolume ?: 80
+        )
         "ALARM"      -> RoutineItem.Alarm(id, order, volume!!, alarmDurationSeconds!!, soundUri!!, vibrate!!)
         else -> throw IllegalStateException("Unknown type: $type")
     }
@@ -55,7 +59,7 @@ data class RoutineItemEntity(
             is RoutineItem.Timer -> RoutineItemEntity(
                 id = item.id, presetId = presetId, order = item.order,
                 type = "TIMER", durationSeconds = item.durationSeconds,
-                tickSound = item.tickSound
+                tickSound = item.tickSound, tickVolume = item.tickVolume
             )
             is RoutineItem.Alarm -> RoutineItemEntity(
                 id = item.id, presetId = presetId, order = item.order,

@@ -13,7 +13,7 @@ import com.androidapp.pomodorotimer.data.db.routine.RoutineItemEntity
 
 @Database(
     entities = [PresetEntity::class, RoutineItemEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,16 +44,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // v4 → v5: presets に order カラム追加
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE presets ADD COLUMN `order` INTEGER NOT NULL DEFAULT 0")
-                // 既存行の order を id 昇順で連番に設定
                 database.execSQL("""
                     UPDATE presets SET `order` = (
                         SELECT COUNT(*) FROM presets p2 WHERE p2.id < presets.id
                     )
                 """.trimIndent())
+            }
+        }
+
+        // v5 → v6: routine_items に tickVolume カラム追加
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE routine_items ADD COLUMN tickVolume INTEGER")
             }
         }
 
@@ -64,7 +69,10 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "routine_timer_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(
+                        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
+                        MIGRATION_4_5, MIGRATION_5_6
+                    )
                     .build()
                     .also { instance = it }
             }

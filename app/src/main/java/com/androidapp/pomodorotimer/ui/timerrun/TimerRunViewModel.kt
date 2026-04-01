@@ -28,6 +28,9 @@ data class TimerRunUiState(
     val currentIndex: Int = 0
 )
 
+/** Tick音イベント: リソース名と音量（0.0〜1.0）のペア */
+data class TickEvent(val resourceName: String, val volume: Float)
+
 class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TimerRunUiState())
@@ -36,9 +39,8 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
     private val _alarmEvent = MutableStateFlow<AlarmEvent?>(null)
     val alarmEvent: StateFlow<AlarmEvent?> = _alarmEvent
 
-    // ティック音イベント: リソース名（"tick_clock" 等）を毎秒emit。null = 無音
-    private val _tickEvent = MutableSharedFlow<String?>(extraBufferCapacity = 1)
-    val tickEvent: SharedFlow<String?> = _tickEvent
+    private val _tickEvent = MutableSharedFlow<TickEvent?>(extraBufferCapacity = 1)
+    val tickEvent: SharedFlow<TickEvent?> = _tickEvent
 
     data class AlarmEvent(val volume: Int, val durationSeconds: Int, val vibrate: Boolean)
 
@@ -99,8 +101,10 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
 
     private fun continueTimer(seconds: Int) {
         timerJob?.cancel()
-        // 現在アイテムのticksoundを取得
-        val tickSound = (executionList.getOrNull(currentIndex) as? RoutineItem.Timer)?.tickSound
+        val timerItem = executionList.getOrNull(currentIndex) as? RoutineItem.Timer
+        val tickSound  = timerItem?.tickSound
+        val tickVolume = (timerItem?.tickVolume ?: 80) / 100f
+
         timerJob = viewModelScope.launch {
             var remaining = seconds
             while (remaining > 0) {
@@ -108,8 +112,9 @@ class TimerRunViewModel(private val repository: PresetRepository) : ViewModel() 
                     remainingSeconds = remaining,
                     progress = calcProgress(remaining)
                 )
-                // ティック音をemit（一時停止からの再開時も含む）
-                _tickEvent.tryEmit(tickSound)
+                if (tickSound != null) {
+                    _tickEvent.tryEmit(TickEvent(tickSound, tickVolume))
+                }
                 delay(1000)
                 remaining--
             }
