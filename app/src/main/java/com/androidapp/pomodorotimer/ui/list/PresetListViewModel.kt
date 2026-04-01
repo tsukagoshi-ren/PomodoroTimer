@@ -37,9 +37,17 @@ class PresetListViewModel(
         PresetListUiState(presets, selectedIds, isSelectionMode)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PresetListUiState())
 
+    /**
+     * 選択モード突入時のプリセットリストのスナップショット。
+     * キャンセル時にこの状態へ DB を復元する。
+     */
+    private var snapshot: List<Preset> = emptyList()
+
     // ---- 選択モード ----
 
     fun enterSelectionMode(presetId: Int) {
+        // 現在の表示リストをスナップショットとして保存
+        snapshot = _presetsFlow.value.toList()
         _isSelectionMode.value = true
         _selectedIds.value = setOf(presetId)
     }
@@ -47,6 +55,7 @@ class PresetListViewModel(
     fun exitSelectionMode() {
         _isSelectionMode.value = false
         _selectedIds.value = emptySet()
+        snapshot = emptyList()
     }
 
     fun toggleSelection(presetId: Int) {
@@ -63,7 +72,48 @@ class PresetListViewModel(
         _selectedIds.value = emptySet()
     }
 
-    // ---- アクション ----
+    // ---- 保存（確定） ----
+
+    fun commitChanges() {
+        // 現状をそのまま確定するだけ（DB はすでに各操作で更新済み）
+        exitSelectionMode()
+    }
+
+    // ---- キャンセル（スナップショットへ復元） ----
+
+    fun cancelChanges() {
+        val snap = snapshot
+        if (snap.isEmpty()) {
+            exitSelectionMode()
+            return
+        }
+        viewModelScope.launch {
+            // 1. 現在 DB にある全プリセットを取得
+            val currentPresets = _presetsFlow.value
+
+            // 2. スナップショットに存在しない ID（選択モード中に追加されたコピー）を削除
+            val snapshotIds = snap.map { it.id }.toSet()
+            val toDelete = currentPresets.filter { it.id !in snapshotIds }
+            if (toDelete.isNotEmpty()) repository.deletePresets(toDelete)
+
+            // 3. スナップショットに存在するが現在 DB にない ID（選択モード中に削除された）を復元
+            val currentIds = currentPresets.map { it.id }.toSet()
+            val toRestore = snap.filter { it.id !in currentIds }
+            // Room の insert(onConflict=REPLACE) を利用して復元
+            // RoutineItem は削除時に CASCADE で消えているため復元不可だが、
+            // Preset 自体は復元する（RoutineItem は空になる）
+            for (preset in toRestore) {
+                repository.savePresetWithId(preset)
+            }
+
+            // 4. 並べ替え・order を元に戻す
+            repository.reorderPresets(snap.map { it.id })
+
+            exitSelectionMode()
+        }
+    }
+
+    // ---- その他アクション ----
 
     fun deletePreset(preset: Preset) {
         viewModelScope.launch { repository.deletePreset(preset) }
@@ -74,17 +124,16 @@ class PresetListViewModel(
         val toDelete = _presetsFlow.value.filter { it.id in ids }
         viewModelScope.launch {
             repository.deletePresets(toDelete)
-            exitSelectionMode()
+            _selectedIds.value = emptySet()
         }
     }
 
     fun copySelected() {
         val ids = _selectedIds.value
-        // order順（現在の表示順）でコピー
         val toCopy = _presetsFlow.value.filter { it.id in ids }
         viewModelScope.launch {
             repository.copyPresets(toCopy)
-            exitSelectionMode()
+            _selectedIds.value = emptySet()
         }
     }
 
@@ -93,8 +142,7 @@ class PresetListViewModel(
         if (fromIndex < 0 || toIndex < 0 || fromIndex >= list.size || toIndex >= list.size) return
         val moved = list.removeAt(fromIndex)
         list.add(toIndex, moved)
-        val orderedIds = list.map { it.id }
-        viewModelScope.launch { repository.reorderPresets(orderedIds) }
+        viewModelScope.launch { repository.reorderPresets(list.map { it.id }) }
     }
 
     class Factory(private val repository: PresetRepository) : ViewModelProvider.Factory {

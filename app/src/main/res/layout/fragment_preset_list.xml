@@ -18,6 +18,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- 通常モード: FAB -->
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/fabAddPreset"
         android:layout_width="wrap_content"
@@ -28,5 +29,38 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 選択モード: キャンセル・保存ボタン（初期は非表示） -->
+    <LinearLayout
+        android:id="@+id/selectionActionBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:visibility="gone"
+        android:weightSum="2"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/buttonSelectionCancel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/action_cancel"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="@color/card_background"
+            style="@style/Widget.App.Button" />
+
+        <Button
+            android:id="@+id/buttonSelectionSave"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/action_save"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

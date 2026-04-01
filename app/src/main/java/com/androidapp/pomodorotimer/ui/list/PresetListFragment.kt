@@ -51,10 +51,10 @@ class PresetListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 選択モード中に戻るで解除
+        // 戻るボタン: 選択モード中はキャンセル処理
         val backCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
-                viewModel.exitSelectionMode()
+                viewModel.cancelChanges()
             }
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
@@ -89,7 +89,7 @@ class PresetListFragment : Fragment() {
         adapter.itemTouchHelper = touchHelper
         touchHelper.attachToRecyclerView(binding.recyclerView)
 
-        // ActionBar メニュー（選択モード連動）
+        // ActionBar メニュー（選択モード中のみ：全選択・コピー・削除）
         val menuHost: MenuHost = requireActivity()
         menuHost.addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
@@ -104,11 +104,9 @@ class PresetListFragment : Fragment() {
                     menu.clear()
                     return
                 }
-                // メニューがまだ展開されていなければ inflate
                 if (menu.findItem(R.id.action_select_all) == null) {
                     requireActivity().menuInflater.inflate(R.menu.menu_preset_selection, menu)
                 }
-                // 全選択 ↔ 全解除 アイコン切り替え
                 menu.findItem(R.id.action_select_all)?.apply {
                     if (state.allSelected) {
                         setIcon(R.drawable.ic_deselect)
@@ -152,15 +150,24 @@ class PresetListFragment : Fragment() {
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
 
+        // 下部ボタン配線
+        binding.buttonSelectionCancel.setOnClickListener {
+            viewModel.cancelChanges()
+        }
+        binding.buttonSelectionSave.setOnClickListener {
+            viewModel.commitChanges()
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.uiState.collect { state ->
                 val prevSelectionMode = adapter.isSelectionMode
+                val prevSelectedIds = adapter.selectedIds
                 adapter.isSelectionMode = state.isSelectionMode
                 adapter.selectedIds = state.selectedIds
                 adapter.submitList(state.presets)
 
-                // 選択モード切り替え時は全行再バインド
-                if (prevSelectionMode != state.isSelectionMode) {
+                if (prevSelectionMode != state.isSelectionMode
+                    || prevSelectedIds != state.selectedIds) {
                     adapter.notifyDataSetChanged()
                 }
 
@@ -171,9 +178,11 @@ class PresetListFragment : Fragment() {
                     activity.supportActionBar?.title =
                         getString(R.string.selection_count, state.selectedCount)
                     binding.fabAddPreset.hide()
+                    binding.selectionActionBar.visibility = View.VISIBLE
                 } else {
                     activity.supportActionBar?.title = getString(R.string.screen_preset_list)
                     binding.fabAddPreset.show()
+                    binding.selectionActionBar.visibility = View.GONE
                 }
 
                 requireActivity().invalidateOptionsMenu()

@@ -22,11 +22,16 @@ class PresetRepository(
     suspend fun getPresetById(id: Int): Preset? =
         presetDao.getPresetById(id)?.toPreset()
 
+    /** 新規保存（auto-increment ID、末尾に追加） */
     suspend fun savePreset(preset: Preset): Int {
         val maxOrder = presetDao.getMaxOrder() ?: -1
         val entity = PresetEntity.fromPreset(preset).copy(order = maxOrder + 1)
-        val id = presetDao.insertPreset(entity)
-        return id.toInt()
+        return presetDao.insertPreset(entity).toInt()
+    }
+
+    /** ID指定で保存（キャンセル時の削除済みプリセット復元用）。onConflict=REPLACE で upsert。 */
+    suspend fun savePresetWithId(preset: Preset) {
+        presetDao.insertPreset(PresetEntity.fromPreset(preset))
     }
 
     suspend fun updatePreset(preset: Preset) =
@@ -41,15 +46,12 @@ class PresetRepository(
     /**
      * 複数プリセットを、それぞれ元の直下にコピーする。
      *
-     * 手順:
-     * 1. 現在の全プリセットを order 順で取得
-     * 2. order が後ろのものから処理することで、前に挿入してもインデックスがずれない
-     * 3. 全挿入後に order を連番で振り直す
+     * 後ろの要素から処理することで、前への挿入でインデックスがずれない。
+     * 全挿入後に order を連番で振り直す。
      */
     suspend fun copyPresets(presets: List<Preset>) {
         val current = getAllPresets().first().toMutableList()
 
-        // 表示順が後ろのものから処理（前への挿入でインデックスずれを防ぐ）
         val sortedByIndexDesc = presets.sortedByDescending { p ->
             current.indexOfFirst { it.id == p.id }
         }
@@ -58,7 +60,6 @@ class PresetRepository(
             val insertIndex = current.indexOfFirst { it.id == original.id }
                 .let { if (it == -1) current.size else it + 1 }
 
-            // DB に複製を挿入（order は後で一括更新するので仮値 0）
             val newId = presetDao.insertPreset(
                 PresetEntity(
                     id = 0,
@@ -69,17 +70,14 @@ class PresetRepository(
                 )
             ).toInt()
 
-            // ルーティンアイテムもコピー
             val items = routineItemDao.getItemsByPresetIdOnce(original.id)
             if (items.isNotEmpty()) {
                 routineItemDao.insertAll(items.map { it.copy(id = 0, presetId = newId) })
             }
 
-            // ローカルリストにも挿入して後続の insertIndex 計算に反映
             current.add(insertIndex, original.copy(id = newId, name = "${original.name} のコピー"))
         }
 
-        // 全プリセットの order を連番で振り直す
         reorderPresets(current.map { it.id })
     }
 
