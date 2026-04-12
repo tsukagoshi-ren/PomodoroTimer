@@ -13,9 +13,12 @@
     <FrameLayout
         android:id="@+id/swipeBgEdit"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="64dp"
         android:background="@color/accent_blue"
-        android:visibility="invisible">
+        android:visibility="invisible"
+        android:clickable="false"
+        android:focusable="false">
 
         <ImageView
             android:layout_width="36dp"
@@ -24,6 +27,8 @@
             android:padding="6dp"
             android:layout_gravity="center_vertical|start"
             android:layout_marginStart="16dp"
+            android:clickable="false"
+            android:focusable="false"
             app:tint="@color/white" />
     </FrameLayout>
 
@@ -31,9 +36,12 @@
     <FrameLayout
         android:id="@+id/swipeBgDelete"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#FFB00020"
-        android:visibility="invisible">
+        android:layout_height="wrap_content"
+        android:minHeight="64dp"
+        android:background="@color/accent_red"
+        android:visibility="invisible"
+        android:clickable="false"
+        android:focusable="false">
 
         <ImageView
             android:layout_width="36dp"
@@ -42,6 +50,8 @@
             android:padding="6dp"
             android:layout_gravity="center_vertical|end"
             android:layout_marginEnd="16dp"
+            android:clickable="false"
+            android:focusable="false"
             app:tint="@color/white" />
     </FrameLayout>
 

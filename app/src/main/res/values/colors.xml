@@ -1,33 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>   <!-- 純黒 | 未使用（予約） -->
+    <color name="white">#FFFFFFFF</color>   <!-- 純白 | ボタンテキスト・アイコン -->
 
-    <!-- ===== アプリ全体のカラーパレット ===== -->
+    <!-- ===== 背景 ===== -->
+    <color name="bg_primary">#FF121212</color>              <!-- 最暗背景（ほぼ黒） | Toolbar背景 -->
+    <color name="bg_surface">#FF1E1E1E</color>              <!-- 暗グレー | 画面背景 -->
 
-    <!-- 背景 -->
-    <color name="bg_primary">#FF121212</color>       <!-- 最も暗い背景 -->
-    <color name="bg_surface">#FF1E1E1E</color>        <!-- サーフェス（画面背景） -->
+    <!-- ===== カード・行 ===== -->
+    <color name="card_background">#FF2C2C2E</color>         <!-- グレー | プリセット・ルーティン行背景 -->
+    <color name="card_background_elevated">#FF3A3A3C</color><!-- 明グレー | 未使用（予約） -->
 
-    <!-- カード・行背景（グレー系） -->
-    <color name="card_background">#FF2C2C2E</color>   <!-- アイテム/プリセット行 -->
-    <color name="card_background_elevated">#FF3A3A3C</color>  <!-- 少し浮いた感じ -->
+    <!-- ===== テキスト ===== -->
+    <color name="card_text_primary">#FFFFFFFF</color>       <!-- 白 | メインテキスト -->
+    <color name="card_text_secondary">#99FFFFFF</color>     <!-- 半透明白 | サブテキスト -->
 
-    <!-- テキスト -->
-    <color name="card_text_primary">#FFFFFFFF</color>
-    <color name="card_text_secondary">#99FFFFFF</color>
+    <!-- ===== アクセント ===== -->
+    <color name="accent_blue">#FF2196F3</color>             <!-- 青 | プライマリボタン・FAB・プログレスバー -->
+    <color name="accent_blue_dark">#FF1565C0</color>        <!-- 濃青 | ボタン押下時 -->
+    <color name="accent_blue_container">#1A2196F3</color>   <!-- 薄青 | ボタン背景（未使用・予約） -->
+    <color name="accent_red">#FFB00020</color>              <!-- 赤 | 削除スワイプ背景 -->
 
-    <!-- ボタン・アクセント（ブルー） -->
-    <color name="accent_blue">#FF2196F3</color>       <!-- プライマリボタン -->
-    <color name="accent_blue_dark">#FF1565C0</color>  <!-- 押下時 -->
-    <color name="accent_blue_container">#1A2196F3</color> <!-- 薄いブルー背景 -->
-
-    <!-- ハイライト（タイマー実行中の現在アイテム） -->
-    <color name="highlight_current">#332196F3</color>
-
-    <!-- アウトライン -->
-    <color name="outline">#FF48484A</color>
-
-    <!-- ルーティン編集カード（前回と同じ） -->
-    <!-- card_background は共用 -->
+    <!-- ===== その他 ===== -->
+    <color name="highlight_current">#332196F3</color>       <!-- 半透明青 | タイマー実行中の現在アイテム -->
+    <color name="outline">#FF48484A</color>                 <!-- 暗グレー | 区切り線・入力欄アンダーライン -->
 </resources>
