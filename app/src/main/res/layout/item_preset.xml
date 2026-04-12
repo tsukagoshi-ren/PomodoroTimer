@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -7,90 +7,118 @@
     android:layout_marginStart="12dp"
     android:layout_marginEnd="12dp"
     android:layout_marginTop="5dp"
-    android:layout_marginBottom="5dp"
-    android:foreground="?attr/selectableItemBackground"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="0dp"
-    app:cardBackgroundColor="@color/card_background"
-    app:strokeWidth="0dp">
+    android:layout_marginBottom="5dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        xmlns:app="http://schemas.android.com/apk/res-auto"
+    <!-- 右スワイプ背景（編集：青） -->
+    <FrameLayout
+        android:id="@+id/swipeBgEdit"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
+        android:layout_height="match_parent"
+        android:background="@color/accent_blue"
+        android:visibility="invisible">
 
-        <!-- チェックボックス（選択モードのみ表示） -->
-        <CheckBox
-            android:id="@+id/checkbox"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:clickable="false"
-            android:focusable="false"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
-
-        <!-- プリセット名 -->
-        <TextView
-            android:id="@+id/textPresetName"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="@color/card_text_primary"
-            android:layout_marginStart="8dp"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toEndOf="@id/checkbox"
-            app:layout_constraintEnd_toStartOf="@id/buttonEdit" />
-
-        <!-- トリガー情報 -->
-        <TextView
-            android:id="@+id/textTrigger"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:textColor="@color/card_text_secondary"
-            android:layout_marginTop="4dp"
-            android:layout_marginStart="8dp"
-            app:layout_constraintTop_toBottomOf="@id/textPresetName"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toEndOf="@id/checkbox"
-            app:layout_constraintEnd_toStartOf="@id/buttonEdit" />
-
-        <!-- 編集ボタン（選択モードのみ表示） -->
-        <ImageButton
-            android:id="@+id/buttonEdit"
+        <ImageView
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:src="@drawable/ic_edit"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/action_edit"
             android:padding="6dp"
-            android:alpha="0.6"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/dragHandle" />
+            android:layout_gravity="center_vertical|start"
+            android:layout_marginStart="16dp"
+            app:tint="@color/white" />
+    </FrameLayout>
 
-        <!-- ドラッグハンドル（選択モードのみ表示） -->
+    <!-- 左スワイプ背景（削除：赤） -->
+    <FrameLayout
+        android:id="@+id/swipeBgDelete"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFB00020"
+        android:visibility="invisible">
+
         <ImageView
-            android:id="@+id/dragHandle"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="@drawable/ic_drag_handle"
-            android:contentDescription="@string/desc_drag_handle"
+            android:src="@drawable/ic_delete"
             android:padding="6dp"
-            android:alpha="0.4"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="16dp"
+            app:tint="@color/white" />
+    </FrameLayout>
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    <!-- カード本体 -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:foreground="?attr/selectableItemBackground"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/card_background"
+        app:strokeWidth="0dp">
 
-</com.google.android.material.card.MaterialCardView>
+        <androidx.constraintlayout.widget.ConstraintLayout
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+
+            <!-- チェックボックス（選択モードのみ表示） -->
+            <CheckBox
+                android:id="@+id/checkbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:clickable="false"
+                android:focusable="false"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent" />
+
+            <!-- プリセット名 -->
+            <TextView
+                android:id="@+id/textPresetName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/card_text_primary"
+                android:layout_marginStart="8dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toEndOf="@id/checkbox"
+                app:layout_constraintEnd_toStartOf="@id/dragHandle" />
+
+            <!-- トリガー情報 -->
+            <TextView
+                android:id="@+id/textTrigger"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="@color/card_text_secondary"
+                android:layout_marginTop="4dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintTop_toBottomOf="@id/textPresetName"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toEndOf="@id/checkbox"
+                app:layout_constraintEnd_toStartOf="@id/dragHandle" />
+
+            <!-- ドラッグハンドル（選択モードのみ表示） -->
+            <ImageView
+                android:id="@+id/dragHandle"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_drag_handle"
+                android:contentDescription="@string/desc_drag_handle"
+                android:padding="6dp"
+                android:alpha="0.4"
+                android:visibility="gone"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

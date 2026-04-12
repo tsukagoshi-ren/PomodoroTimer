@@ -51,7 +51,6 @@ class PresetListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 戻るボタン: 選択モード中はキャンセル処理
         val backCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 viewModel.cancelChanges()
@@ -71,11 +70,21 @@ class PresetListFragment : Fragment() {
             onLongPress = { preset ->
                 viewModel.enterSelectionMode(preset.id)
             },
-            onEditClick = { preset ->
+            onEditSwipe = { preset ->
                 findNavController().navigate(
                     R.id.action_list_to_presetEdit,
                     Bundle().apply { putInt("presetId", preset.id) }
                 )
+            },
+            onDeleteSwipe = { preset ->
+                AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.dialog_delete_title)
+                    .setMessage(getString(R.string.dialog_delete_message, preset.name))
+                    .setPositiveButton(R.string.action_delete) { _, _ ->
+                        viewModel.deletePreset(preset)
+                    }
+                    .setNegativeButton(R.string.action_cancel, null)
+                    .show()
             },
             onCheckToggle = { preset ->
                 viewModel.toggleSelection(preset.id)
@@ -85,11 +94,19 @@ class PresetListFragment : Fragment() {
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
 
+        // スクロール時に開いているスワイプを閉じる
+        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                    closeAllSwipes()
+                }
+            }
+        })
+
         setupTouchHelper()
         adapter.itemTouchHelper = touchHelper
         touchHelper.attachToRecyclerView(binding.recyclerView)
 
-        // ActionBar メニュー（選択モード中のみ：全選択・コピー・削除）
         val menuHost: MenuHost = requireActivity()
         menuHost.addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
@@ -150,7 +167,6 @@ class PresetListFragment : Fragment() {
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
 
-        // 下部ボタン配線
         binding.buttonSelectionCancel.setOnClickListener {
             viewModel.cancelChanges()
         }
@@ -169,6 +185,11 @@ class PresetListFragment : Fragment() {
                 if (prevSelectionMode != state.isSelectionMode
                     || prevSelectedIds != state.selectedIds) {
                     adapter.notifyDataSetChanged()
+                }
+
+                // 選択モード突入時はスワイプを全部閉じる
+                if (state.isSelectionMode && !prevSelectionMode) {
+                    closeAllSwipes()
                 }
 
                 backCallback.isEnabled = state.isSelectionMode
@@ -194,6 +215,16 @@ class PresetListFragment : Fragment() {
                 R.id.action_list_to_presetEdit,
                 Bundle().apply { putInt("presetId", -1) }
             )
+        }
+    }
+
+    private fun closeAllSwipes() {
+        val layoutManager = binding.recyclerView.layoutManager as? LinearLayoutManager ?: return
+        val first = layoutManager.findFirstVisibleItemPosition()
+        val last = layoutManager.findLastVisibleItemPosition()
+        for (i in first..last) {
+            val vh = binding.recyclerView.findViewHolderForAdapterPosition(i)
+            if (vh is PresetAdapter.ViewHolder) vh.resetSwipe()
         }
     }
 
