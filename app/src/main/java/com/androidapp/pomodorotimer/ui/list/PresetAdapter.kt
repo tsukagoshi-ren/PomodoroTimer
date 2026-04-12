@@ -30,7 +30,6 @@ class PresetAdapter(
     var isSelectionMode: Boolean = false
     var selectedIds: Set<Int> = emptySet()
 
-    // 現在スワイプ確定中のViewHolder（1つのみ許可）
     private var swipedHolder: ViewHolder? = null
 
     companion object DiffCallback : DiffUtil.ItemCallback<Preset>() {
@@ -42,7 +41,6 @@ class PresetAdapter(
         private const val SNAP_THRESHOLD_RATIO = 0.3f
     }
 
-    /** 他の行がスワイプされたときに既存のスワイプを閉じる */
     private fun closeSwipedHolder(except: ViewHolder? = null) {
         val current = swipedHolder ?: return
         if (current === except) return
@@ -55,7 +53,7 @@ class PresetAdapter(
 
         private var swipeMaxPx = 0f
         var isSwiped = false
-        private var swipedDirection = 0  // 1=右(編集), -1=左(削除)
+        private var swipedDirection = 0
 
         @SuppressLint("ClickableViewAccessibility")
         fun bind(preset: Preset) {
@@ -77,6 +75,9 @@ class PresetAdapter(
 
             if (isSelectionMode) {
                 resetSwipe()
+                // 選択モードでは背景タッチリスナーをクリア
+                binding.swipeBgEdit.setOnTouchListener(null)
+                binding.swipeBgDelete.setOnTouchListener(null)
                 binding.checkbox.visibility = View.VISIBLE
                 binding.checkbox.isChecked = preset.id in selectedIds
                 binding.dragHandle.visibility = View.VISIBLE
@@ -94,6 +95,13 @@ class PresetAdapter(
                 binding.dragHandle.visibility = View.GONE
                 binding.root.setOnClickListener(null)
                 binding.root.setOnLongClickListener(null)
+                // 背景エリアへのタッチをcardViewに転送する
+                binding.swipeBgEdit.setOnTouchListener { _, event ->
+                    binding.cardView.dispatchTouchEvent(event)
+                }
+                binding.swipeBgDelete.setOnTouchListener { _, event ->
+                    binding.cardView.dispatchTouchEvent(event)
+                }
                 setupSwipeTouch(preset)
             }
         }
@@ -131,7 +139,6 @@ class PresetAdapter(
                     }
 
                     MotionEvent.ACTION_MOVE -> {
-                        // isSwiped状態で少しでも動いたら閉じる
                         if (isSwiped) {
                             val dx = event.rawX - startX
                             val dy = event.rawY - startY
@@ -179,7 +186,6 @@ class PresetAdapter(
                         val dy = event.rawY - startY
 
                         when {
-                            // isSwiped状態でのタップ → アクション実行
                             isSwiped && abs(dx) < DIRECTION_THRESHOLD && abs(dy) < DIRECTION_THRESHOLD -> {
                                 val dir = swipedDirection
                                 resetSwipeAnimated()
@@ -189,13 +195,11 @@ class PresetAdapter(
                                 true
                             }
 
-                            // 通常タップ
                             !swipeDecided && abs(dx) < DIRECTION_THRESHOLD && abs(dy) < DIRECTION_THRESHOLD -> {
                                 if (!longPressHandled) onTap(preset)
                                 true
                             }
 
-                            // 横スワイプ終了
                             swipeDecided -> {
                                 val totalTx = startTransX + dx
                                 val threshold = swipeMaxPx * SNAP_THRESHOLD_RATIO
