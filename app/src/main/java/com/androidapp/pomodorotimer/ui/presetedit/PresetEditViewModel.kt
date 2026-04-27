@@ -15,7 +15,9 @@ data class PresetEditUiState(
     val id: Int = -1,
     val name: String = "",
     val triggerType: TriggerType = TriggerType.BUTTON,
-    val triggerDatetime: Long? = null
+    val triggerDatetime: Long? = null,
+    val weekdays: Int = 0,
+    val triggerTimeOfDay: Int = 8 * 60  // デフォルト 08:00
 )
 
 class PresetEditViewModel(
@@ -39,7 +41,9 @@ class PresetEditViewModel(
                 id = preset.id,
                 name = preset.name,
                 triggerType = preset.triggerType,
-                triggerDatetime = preset.triggerDatetime
+                triggerDatetime = preset.triggerDatetime,
+                weekdays = preset.weekdays,
+                triggerTimeOfDay = preset.triggerTimeOfDay
             )
         }
     }
@@ -48,8 +52,26 @@ class PresetEditViewModel(
         _uiState.value = _uiState.value.copy(name = name)
     }
 
-    fun setTrigger(type: TriggerType, datetime: Long?) {
-        _uiState.value = _uiState.value.copy(triggerType = type, triggerDatetime = datetime)
+    fun setTriggerButton() {
+        _uiState.value = _uiState.value.copy(
+            triggerType = TriggerType.BUTTON,
+            triggerDatetime = null
+        )
+    }
+
+    fun setTriggerDatetime(datetime: Long) {
+        _uiState.value = _uiState.value.copy(
+            triggerType = TriggerType.DATETIME,
+            triggerDatetime = datetime
+        )
+    }
+
+    fun setTriggerWeekly(weekdays: Int, timeOfDay: Int) {
+        _uiState.value = _uiState.value.copy(
+            triggerType = TriggerType.WEEKLY,
+            weekdays = weekdays,
+            triggerTimeOfDay = timeOfDay
+        )
     }
 
     /**
@@ -66,17 +88,19 @@ class PresetEditViewModel(
             id = if (state.id == -1) 0 else state.id,
             name = name,
             triggerType = state.triggerType,
-            triggerDatetime = state.triggerDatetime
+            triggerDatetime = state.triggerDatetime,
+            weekdays = state.weekdays,
+            triggerTimeOfDay = state.triggerTimeOfDay
         )
         return if (state.id == -1) {
             val newId = repository.savePreset(preset)
             _uiState.value = state.copy(id = newId)
             provisionallyCreatedId = newId   // 仮作成IDを記録
-            scheduleOrCancel(newId, state)
+            AlarmScheduler.scheduleOrCancel(appContext, preset)
             newId
         } else {
             repository.updatePreset(preset)
-            scheduleOrCancel(state.id, state)
+            AlarmScheduler.scheduleOrCancel(appContext, preset)
             state.id
         }
     }
@@ -108,10 +132,12 @@ class PresetEditViewModel(
             id = currentId,
             name = state.name,
             triggerType = state.triggerType,
-            triggerDatetime = state.triggerDatetime
+            triggerDatetime = state.triggerDatetime,
+            weekdays = state.weekdays,
+            triggerTimeOfDay = state.triggerTimeOfDay
         )
         repository.updatePreset(preset)
-        scheduleOrCancel(currentId, state)
+        AlarmScheduler.scheduleOrCancel(appContext, preset)
 
         // 正常保存できたので仮作成フラグを解除
         provisionallyCreatedId = null
@@ -131,16 +157,16 @@ class PresetEditViewModel(
         provisionallyCreatedId = null
     }
 
-    private fun scheduleOrCancel(presetId: Int, state: PresetEditUiState) {
-        if (state.triggerType == TriggerType.DATETIME &&
-            state.triggerDatetime != null &&
-            state.triggerDatetime > System.currentTimeMillis()
-        ) {
-            AlarmScheduler.schedule(appContext, presetId, state.triggerDatetime)
-        } else {
-            AlarmScheduler.cancel(appContext, presetId)
-        }
-    }
+//    private fun scheduleOrCancel(presetId: Int, state: PresetEditUiState) {
+//        if (state.triggerType == TriggerType.DATETIME &&
+//            state.triggerDatetime != null &&
+//            state.triggerDatetime > System.currentTimeMillis()
+//        ) {
+//            AlarmScheduler.schedule(appContext, presetId, state.triggerDatetime)
+//        } else {
+//            AlarmScheduler.cancel(appContext, presetId)
+//        }
+//    }
 
     class Factory(
         private val repository: PresetRepository,

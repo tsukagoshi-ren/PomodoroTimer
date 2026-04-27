@@ -39,6 +39,11 @@
     <string name="trigger_datetime">日時指定</string>
     <string name="trigger_datetime_select">日時を選択</string>
     <string name="trigger_datetime_unset">日時未設定</string>
+    <!-- WEEKLYトリガー -->
+    <string name="trigger_weekly">曜日と時刻（繰り返し）</string>
+    <string name="dialog_weekly_title">繰り返しトリガー設定</string>
+    <string name="label_trigger_time">時刻</string>
+    <string name="error_no_weekday_selected">曜日を1つ以上選択してください</string>
 
     <!-- ルーティン編集 -->
     <string name="action_add_item">アイテムを追加</string>

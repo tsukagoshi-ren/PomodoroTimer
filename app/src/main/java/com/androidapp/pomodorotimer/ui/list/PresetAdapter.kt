@@ -13,6 +13,7 @@ import com.androidapp.pomodorotimer.R
 import com.androidapp.pomodorotimer.data.model.Preset
 import com.androidapp.pomodorotimer.data.model.TriggerType
 import com.androidapp.pomodorotimer.databinding.ItemPresetBinding
+import com.androidapp.pomodorotimer.util.AlarmScheduler
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -70,6 +71,12 @@ class PresetAdapter(
                     } else {
                         binding.root.context.getString(R.string.trigger_datetime_unset)
                     }
+                }
+                TriggerType.WEEKLY -> {
+                    val days = AlarmScheduler.weekdaysToString(preset.weekdays)
+                    val h = preset.triggerTimeOfDay / 60
+                    val m = preset.triggerTimeOfDay % 60
+                    "$days %02d:%02d".format(h, m)
                 }
             }
 

@@ -12,14 +12,18 @@ data class PresetEntity(
     val name: String,
     val triggerType: String,
     val triggerDatetime: Long?,
-    val order: Int = 0
+    val order: Int = 0,
+    val weekdays: Int = 0,           // v7追加
+    val triggerTimeOfDay: Int = 0    // v7追加
 ) {
     fun toPreset() = Preset(
         id = id,
         name = name,
         triggerType = TriggerType.valueOf(triggerType),
         triggerDatetime = triggerDatetime,
-        order = order
+        order = order,
+        weekdays = weekdays,
+        triggerTimeOfDay = triggerTimeOfDay
     )
 
     companion object {
@@ -28,7 +32,9 @@ data class PresetEntity(
             name = p.name,
             triggerType = p.triggerType.name,
             triggerDatetime = p.triggerDatetime,
-            order = p.order
+            order = p.order,
+            weekdays = p.weekdays,
+            triggerTimeOfDay = p.triggerTimeOfDay
         )
     }
 }

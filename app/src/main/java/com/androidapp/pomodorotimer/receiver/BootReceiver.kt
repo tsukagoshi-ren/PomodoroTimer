@@ -20,12 +20,20 @@ class BootReceiver : BroadcastReceiver() {
             val presets = (context.applicationContext as App)
                 .presetRepository.getAllPresets().first()
 
-            presets.filter {
-                it.triggerType == TriggerType.DATETIME &&
-                        it.triggerDatetime != null &&
-                        it.triggerDatetime > System.currentTimeMillis()
-            }.forEach {
-                AlarmScheduler.schedule(context, it.id, it.triggerDatetime!!)
+            presets.forEach { preset ->
+                when (preset.triggerType) {
+                    TriggerType.DATETIME -> {
+                        val dt = preset.triggerDatetime
+                        if (dt != null && dt > System.currentTimeMillis()) {
+                            AlarmScheduler.schedule(context, preset.id, dt)
+                        }
+                    }
+                    TriggerType.WEEKLY -> {
+                        // 次回の該当曜日・時刻を再スケジュール
+                        AlarmScheduler.scheduleOrCancel(context, preset)
+                    }
+                    TriggerType.BUTTON -> { /* 何もしない */ }
+                }
             }
         }
     }
